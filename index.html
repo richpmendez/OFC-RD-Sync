@@ -775,13 +775,13 @@ const App = (() => {
   let projectSections   = [];   // [{ name, gid }] for current project
 
   /* ── Init ────────────────────────────────────────────── */
-  function init() {
+  async function init() {
     if (!cfg.clientId && !cfg.asanaPAT) {
       showScreen('setup');
       el('setup-tenantId').value = cfg.tenantId;
       return;
     }
-    if (cfg.clientId) { _initMSAL(); }
+    if (cfg.clientId) { try { await _initMSAL(); } catch(e) { console.warn('MSAL init:', e); } }
     const accounts = msalApp ? msalApp.getAllAccounts() : [];
     if (accounts.length > 0) {
       account = accounts[0];
@@ -828,7 +828,7 @@ const App = (() => {
   }
 
   /* ── MSAL ────────────────────────────────────────────── */
-  function _initMSAL() {
+  async function _initMSAL() {
     if (!cfg.clientId) return;
     msalApp = new msal.PublicClientApplication({
       auth: {
@@ -838,14 +838,18 @@ const App = (() => {
       },
       cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
     });
+    await msalApp.initialize();
   }
 
   async function login() {
     try {
+      if (!msalApp) await _initMSAL();
+      if (!msalApp) { alert('Azure Client ID not configured. Go to ⚙ Settings.'); return; }
       const resp = await msalApp.loginPopup({ scopes: ['User.Read', 'Files.Read'] });
       account = resp.account;
       showScreen('app');
       _updateUserChip();
+      loadProjects();
     } catch(e) {
       alert('Sign-in failed: ' + (e.message || e));
     }
