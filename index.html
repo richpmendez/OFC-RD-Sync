@@ -1266,10 +1266,10 @@ const App = (() => {
               <td colspan="2">
                 <button class="btn btn-ghost btn-sm" onclick="App.addIngredient()" style="font-size:11px;">＋ Add Ingredient</button>
               </td>
-              <td class="num" style="font-weight:700; padding:6px 10px;" class="${pctOk?'':'cell-err'}">${pctPct}%</td>
+              <td id="tfoot-pct" class="num ${pctOk?'':'cell-err'}" style="font-weight:700; padding:6px 10px;">${pctPct}%</td>
               <td></td>
-              <td class="num" style="font-weight:700; padding:6px 10px;">${totalFBrix.toFixed(3)}</td>
-              <td class="num" style="font-weight:700; padding:6px 10px;">${totalRecipe.toLocaleString()}</td>
+              <td id="tfoot-brix" class="num" style="font-weight:700; padding:6px 10px;">${totalFBrix.toFixed(3)}</td>
+              <td class="num" style="font-weight:700; padding:6px 10px;">${ver.batchWeight.toLocaleString()}</td>
               <td colspan="2"></td>
             </tr>
           </tfoot>
@@ -1561,9 +1561,9 @@ const App = (() => {
         &nbsp;|&nbsp; <strong>${totalBrix.toFixed(2)}°Bx</strong>
         &nbsp;|&nbsp; <strong>${ver.batchWeight.toLocaleString()} g</strong>`;
     }
-    const tfoot = document.querySelector('.ftable tfoot tr td:nth-child(3)');
+    const tfoot = document.getElementById('tfoot-pct');
     if (tfoot) { tfoot.textContent = pctPct + '%'; tfoot.className = pctOk ? 'num' : 'num cell-err'; }
-    const tfootBrix = document.querySelector('.ftable tfoot tr td:nth-child(5)');
+    const tfootBrix = document.getElementById('tfoot-brix');
     if (tfootBrix) tfootBrix.textContent = totalBrix.toFixed(3);
 
     // Update computed field in metrics
