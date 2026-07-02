@@ -811,7 +811,7 @@ const App = (() => {
     }
     _saveConfig(clientId, tenantId, pat);
     el('setup-error').style.display = 'none';
-    if (clientId) _initMSAL();
+    try { if (clientId) _initMSAL(); } catch(e) { console.warn('MSAL init:', e); }
     showScreen('login');
   }
 
@@ -874,7 +874,7 @@ const App = (() => {
 
   function saveSettings() {
     _saveConfig(v('s-clientId'), v('s-tenantId'), v('s-asanaPAT'));
-    if (cfg.clientId) _initMSAL();
+    try { if (cfg.clientId) _initMSAL(); } catch(e) { console.warn('MSAL init:', e); }
     closeModal('modal-settings');
   }
 
