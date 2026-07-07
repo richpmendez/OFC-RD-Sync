@@ -740,8 +740,8 @@ const NPD_PROJECT = '1206088215242097';
 // GET /sites/{site-id}/drives for the drive ID of the library's drive).
 // Until both are set, the Formula Library panel will show a setup notice
 // instead of trying to call Graph.
-const SP_SITE_ID   = 'TBD'; // e.g. 'oregonfruitproducts.sharepoint.com,xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx,yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy'
-const SP_DRIVE_ID  = 'TBD'; // e.g. 'b!xxxxxxxxxxxxxxxxxxxxxx...'
+const SP_SITE_ID   = 'oregonfruitproducts.sharepoint.com,bcbcd367-96a8-44fe-86d6-7524de07cb3c,e4a9d7de-d3e3-4091-a10d-6f2ea059a059';
+const SP_DRIVE_ID  = 'b!Z9O8vKiW_kSG1nUk3gfLPN7XqeTj05FAoQ1vLqBZoFmB09aX02wLTalnDmNg-il1';
 const SP_ROOT_PATH = 'Formula Library';
 function _spConfigured() { return SP_SITE_ID !== 'TBD' && SP_DRIVE_ID !== 'TBD' && SP_SITE_ID && SP_DRIVE_ID; }
 
@@ -864,7 +864,7 @@ const App = (() => {
       auth: {
         clientId: cfg.clientId,
         authority: 'https://login.microsoftonline.com/' + cfg.tenantId,
-        redirectUri: window.location.origin + window.location.pathname
+        redirectUri: 'https://richpmendez.github.io/OFC-RD-Sync/'
       },
       cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true }
     });
