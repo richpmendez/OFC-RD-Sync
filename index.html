@@ -484,6 +484,14 @@ html, body { height: 100%; }
   color: var(--text); word-break: break-all;
 }
 .wb-drop-date { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.hdr-savestatus { font-size: 10px; color: var(--text-muted); margin-left: 8px; }
+.sp-drop-item { padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; display:flex; align-items:center; gap:6px; }
+.sp-drop-item:hover { background: var(--yellow-light); }
+.sp-drop-item:last-child { border-bottom: none; }
+.sp-drop-back { padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; font-weight: 700; color: var(--text-muted); }
+.sp-drop-back:hover { background: var(--yellow-light); }
+.sp-drop-empty, .sp-drop-loading, .sp-drop-error { padding: 12px; font-size: 11px; color: var(--text-muted); }
+.sp-drop-error { color: var(--coral); }
 .wb-drop-divider { height: 1px; background: var(--border); }
 .wb-drop-browse {
   display: block; padding: 10px 12px; cursor: pointer;
@@ -601,7 +609,15 @@ html, body { height: 100%; }
     <span class="logo">OREGON FRUIT CO. <span>/ FORMULA SYNC</span></span>
     <span class="hdivider"></span>
     <span class="wb-name" id="hdr-wb">No workbook loaded</span>
+    <span class="hdr-savestatus" id="hdr-savestatus"></span>
     <span class="ml-auto flex gap-8">
+      <div class="wb-dropdown-wrap" id="sp-dropdown-wrap">
+        <button class="btn btn-secondary btn-sm" onclick="App.toggleSpDropdown()">☁ Formula Library ▾</button>
+        <div class="wb-dropdown" id="sp-dropdown" style="display:none; width:280px;">
+          <div class="wb-drop-header" id="sp-drop-header">Formula Library</div>
+          <div id="sp-drop-list"></div>
+        </div>
+      </div>
       <div class="wb-dropdown-wrap" id="wb-dropdown-wrap">
         <button class="btn btn-secondary btn-sm" onclick="App.toggleWbDropdown()">📁 Open Workbook ▾</button>
         <div class="wb-dropdown" id="wb-dropdown" style="display:none;">
@@ -614,6 +630,7 @@ html, body { height: 100%; }
           </label>
         </div>
       </div>
+      <button class="btn btn-secondary btn-sm" id="btn-save-sp" onclick="App.saveToSharePoint()" title="Save current formula to SharePoint">💾 Save</button>
       <button class="btn btn-secondary btn-sm" onclick="App.openSettings()">⚙</button>
       <span class="user-chip" id="hdr-user"></span>
     </span>
@@ -716,6 +733,18 @@ html, body { height: 100%; }
 
 const NPD_PROJECT = '1206088215242097';
 
+// ── Phase 2: SharePoint Formula Library config ─────────
+// Fill these in once the "Formula Library" document library exists on the
+// OFC R&D SharePoint site and you've looked up the IDs via Graph Explorer
+// (GET /sites/{hostname}:/sites/{site-path} for site ID, then
+// GET /sites/{site-id}/drives for the drive ID of the library's drive).
+// Until both are set, the Formula Library panel will show a setup notice
+// instead of trying to call Graph.
+const SP_SITE_ID   = 'TBD'; // e.g. 'oregonfruitproducts.sharepoint.com,xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx,yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy'
+const SP_DRIVE_ID  = 'TBD'; // e.g. 'b!xxxxxxxxxxxxxxxxxxxxxx...'
+const SP_ROOT_PATH = 'Formula Library';
+function _spConfigured() { return SP_SITE_ID !== 'TBD' && SP_DRIVE_ID !== 'TBD' && SP_SITE_ID && SP_DRIVE_ID; }
+
 const LS = {
   get: k => localStorage.getItem('ofc_sync_' + k) || '',
   set: (k, v) => localStorage.setItem('ofc_sync_' + k, v || '')
@@ -773,6 +802,7 @@ const App = (() => {
   let sectionsOpen    = {};
   let currentProjectGid = NPD_PROJECT;
   let projectSections   = [];   // [{ name, gid }] for current project
+  let spBrowsePath      = SP_ROOT_PATH; // current folder shown in Formula Library dropdown
 
   /* ── Init ────────────────────────────────────────────── */
   async function init() {
@@ -841,11 +871,16 @@ const App = (() => {
     await msalApp.initialize();
   }
 
+  // All scopes the app ever needs, requested together at sign-in so users
+  // only see one consent screen (admin consent is already granted tenant-wide
+  // for the SharePoint scopes — see session notes).
+  const LOGIN_SCOPES = ['User.Read', 'Files.Read', 'Sites.Read.All', 'Files.ReadWrite.All'];
+
   async function login() {
     try {
       if (!msalApp) await _initMSAL();
       if (!msalApp) { alert('Azure Client ID not configured. Go to ⚙ Settings.'); return; }
-      const resp = await msalApp.loginPopup({ scopes: ['User.Read', 'Files.Read'] });
+      const resp = await msalApp.loginPopup({ scopes: LOGIN_SCOPES });
       account = resp.account;
       showScreen('app');
       _updateUserChip();
@@ -855,17 +890,71 @@ const App = (() => {
     }
   }
 
-  async function _getToken() {
+  async function _getToken(scopes) {
+    scopes = scopes || ['Files.Read'];
     if (!msalApp || !account) throw new Error('Not signed in with Microsoft.');
     try {
-      return (await msalApp.acquireTokenSilent({ scopes: ['Files.Read'], account })).accessToken;
+      return (await msalApp.acquireTokenSilent({ scopes, account })).accessToken;
     } catch {
-      return (await msalApp.acquireTokenPopup({ scopes: ['Files.Read'], account })).accessToken;
+      return (await msalApp.acquireTokenPopup({ scopes, account })).accessToken;
     }
+  }
+
+  async function _getSpToken() {
+    return _getToken(['Sites.Read.All', 'Files.ReadWrite.All']);
   }
 
   function _updateUserChip() {
     if (account) el('hdr-user').textContent = account.name || account.username || '';
+  }
+
+  /* ── Graph API (SharePoint Formula Library) ─────────────
+     Path convention: 'Formula Library/{Customer}/{product-slug}.json'
+     Each file is the same shape as the in-memory `wb` object. */
+  const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
+
+  function _encPath(path) {
+    // Encode each path segment individually so slashes survive.
+    return path.split('/').map(encodeURIComponent).join('/');
+  }
+
+  async function _graphFetch(path, opts) {
+    const token = await _getSpToken();
+    const res = await fetch(GRAPH_BASE + path, Object.assign({}, opts, {
+      headers: Object.assign({ 'Authorization': 'Bearer ' + token }, (opts && opts.headers) || {})
+    }));
+    if (!res.ok) {
+      let detail = '';
+      try { detail = (await res.json()).error?.message || ''; } catch(e) {}
+      throw new Error('Graph ' + res.status + (detail ? ': ' + detail : ''));
+    }
+    return res;
+  }
+
+  const Graph = {
+    async listFolder(folderPath) {
+      const res = await _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(folderPath)}:/children?$select=name,folder,file,size,lastModifiedDateTime`);
+      const data = await res.json();
+      return data.value || [];
+    },
+    async readJson(filePath) {
+      const res = await _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`);
+      return res.json();
+    },
+    async writeJson(filePath, obj) {
+      const res = await _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(obj, null, 2)
+      });
+      return res.json();
+    }
+  };
+
+  function _slugify(s) {
+    return String(s || '').trim().toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'untitled';
   }
 
   /* ── Settings ────────────────────────────────────────── */
@@ -1821,10 +1910,128 @@ const App = (() => {
     loadProjects();
   }
 
+  /* ── Formula Library (SharePoint) dropdown ──────────────*/
+  function toggleSpDropdown() {
+    const dd = el('sp-dropdown');
+    if (!dd) return;
+    const opening = dd.style.display === 'none';
+    dd.style.display = opening ? 'block' : 'none';
+    if (opening) {
+      spBrowsePath = SP_ROOT_PATH;
+      _renderSpDropdown();
+    }
+  }
+
+  async function _renderSpDropdown() {
+    const list   = el('sp-drop-list');
+    const header = el('sp-drop-header');
+    if (!list) return;
+    header.textContent = spBrowsePath;
+
+    if (!_spConfigured()) {
+      list.innerHTML = `<div class="sp-drop-error">SharePoint isn't set up yet.<br><br>SP_SITE_ID / SP_DRIVE_ID are still "TBD" near the top of the &lt;script&gt; block. Finish the one-time SharePoint setup, then plug the IDs in.</div>`;
+      return;
+    }
+    if (!account) {
+      list.innerHTML = `<div class="sp-drop-error">Sign in with Microsoft first to browse the Formula Library.</div>`;
+      return;
+    }
+
+    list.innerHTML = `<div class="sp-drop-loading">Loading…</div>`;
+    try {
+      const items = await Graph.listFolder(spBrowsePath);
+      let html = '';
+      if (spBrowsePath !== SP_ROOT_PATH) {
+        html += `<div class="sp-drop-back" onclick="App.spNavigateUp()">⬅ Back</div>`;
+      }
+      const folders = items.filter(i => i.folder);
+      const files   = items.filter(i => i.file && i.name.toLowerCase().endsWith('.json'));
+      if (!folders.length && !files.length) {
+        html += `<div class="sp-drop-empty">Empty folder</div>`;
+      }
+      folders.forEach(f => {
+        html += `<div class="sp-drop-item" onclick="App.spNavigateInto('${_escHtml(f.name)}')">📁 ${_escHtml(f.name)}</div>`;
+      });
+      files.forEach(f => {
+        html += `<div class="sp-drop-item" onclick="App.openFromSharePoint('${_escHtml(spBrowsePath + '/' + f.name)}')">🧪 ${_escHtml(f.name.replace(/\.json$/i, ''))}</div>`;
+      });
+      list.innerHTML = html;
+    } catch(e) {
+      list.innerHTML = `<div class="sp-drop-error">Couldn't load: ${_escHtml(e.message || String(e))}</div>`;
+    }
+  }
+
+  function spNavigateInto(folderName) {
+    spBrowsePath = spBrowsePath + '/' + folderName;
+    _renderSpDropdown();
+  }
+
+  function spNavigateUp() {
+    const parts = spBrowsePath.split('/');
+    parts.pop();
+    spBrowsePath = parts.join('/') || SP_ROOT_PATH;
+    _renderSpDropdown();
+  }
+
+  async function openFromSharePoint(filePath) {
+    try {
+      const data = await Graph.readJson(filePath);
+      wb = data;
+      wb._spPath = filePath;
+      selIdx = 0;
+      syncSet = new Set((wb.versions || []).map(v => v.label));
+      _populateBCDatalist(wb.bcItems || []);
+      showScreen('app');
+      _updateUserChip();
+      el('hdr-wb').textContent = (wb.productName || filePath.split('/').pop());
+      _setSaveStatus('Loaded from SharePoint');
+      const dd = el('sp-dropdown'); if (dd) dd.style.display = 'none';
+      _render();
+      loadProjects();
+    } catch(e) {
+      alert('Could not load formula from SharePoint: ' + (e.message || e));
+    }
+  }
+
+  /* ── Save to SharePoint ──────────────────────────────── */
+  async function saveToSharePoint() {
+    if (!wb) { alert('Open or create a formula first.'); return; }
+    if (!_spConfigured()) { alert('SharePoint isn\'t configured yet — see SP_SITE_ID / SP_DRIVE_ID near the top of the script.'); return; }
+    if (!account) { alert('Sign in with Microsoft first.'); return; }
+
+    let path = wb._spPath;
+    if (!path) {
+      const customer = wb.customer || prompt('Customer name (for the Formula Library folder):', '');
+      if (!customer) return;
+      const productSlug = _slugify(wb.productName);
+      path = `${SP_ROOT_PATH}/${customer}/${productSlug}.json`;
+      const confirmed = confirm(`Save to:\n${path}\n\nContinue?`);
+      if (!confirmed) return;
+    }
+
+    _setSaveStatus('Saving…');
+    try {
+      const payload = Object.assign({}, wb);
+      delete payload._spPath; // internal-only, don't persist
+      await Graph.writeJson(path, payload);
+      wb._spPath = path;
+      _setSaveStatus('Saved ' + new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}));
+    } catch(e) {
+      _setSaveStatus('');
+      alert('Save failed: ' + (e.message || e));
+    }
+  }
+
+  function _setSaveStatus(text) {
+    const el2 = el('hdr-savestatus');
+    if (el2) el2.textContent = text;
+  }
+
   /* ── Public API ──────────────────────────────────────── */
   return {
     init, login, saveSetup, skipToLocalMode, saveSettings, openSettings,
     openLocalFile, openRecentWb, toggleWbDropdown,
+    toggleSpDropdown, spNavigateInto, spNavigateUp, openFromSharePoint, saveToSharePoint,
     loadProjects, loadAsanaTasks, onProjectChange, filterTasks,
     toggleSection, selectTask,
     selectVersion, toggleSyncVersion, openNewVersionModal, confirmNewVersion,
