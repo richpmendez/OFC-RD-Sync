@@ -941,6 +941,10 @@ const App = (() => {
       const res = await _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`);
       return res.json();
     },
+    async readBinary(filePath) {
+      const res = await _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`);
+      return res.arrayBuffer();
+    },
     async writeJson(filePath, obj) {
       const res = await _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`, {
         method: 'PUT',
@@ -1945,15 +1949,19 @@ const App = (() => {
         html += `<div class="sp-drop-back" onclick="App.spNavigateUp()">⬅ Back</div>`;
       }
       const folders = items.filter(i => i.folder);
-      const files   = items.filter(i => i.file && i.name.toLowerCase().endsWith('.json'));
-      if (!folders.length && !files.length) {
+      const jsonFiles = items.filter(i => i.file && i.name.toLowerCase().endsWith('.json'));
+      const xlsxFiles = items.filter(i => i.file && (i.name.toLowerCase().endsWith('.xlsx') || i.name.toLowerCase().endsWith('.xlsm')));
+      if (!folders.length && !jsonFiles.length && !xlsxFiles.length) {
         html += `<div class="sp-drop-empty">Empty folder</div>`;
       }
       folders.forEach(f => {
         html += `<div class="sp-drop-item" onclick="App.spNavigateInto('${_escHtml(f.name)}')">📁 ${_escHtml(f.name)}</div>`;
       });
-      files.forEach(f => {
+      jsonFiles.forEach(f => {
         html += `<div class="sp-drop-item" onclick="App.openFromSharePoint('${_escHtml(spBrowsePath + '/' + f.name)}')">🧪 ${_escHtml(f.name.replace(/\.json$/i, ''))}</div>`;
+      });
+      xlsxFiles.forEach(f => {
+        html += `<div class="sp-drop-item" onclick="App.openXlsxFromSharePoint('${_escHtml(spBrowsePath + '/' + f.name)}')">📊 ${_escHtml(f.name)}</div>`;
       });
       list.innerHTML = html;
     } catch(e) {
@@ -1990,6 +1998,38 @@ const App = (() => {
       loadProjects();
     } catch(e) {
       alert('Could not load formula from SharePoint: ' + (e.message || e));
+    }
+  }
+
+  async function openXlsxFromSharePoint(filePath) {
+    try {
+      const buffer = await Graph.readBinary(filePath);
+      const xlWb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+      const sheet = xlWb.Sheets['Bench Top'];
+      if (!sheet) throw new Error('No "Bench Top" sheet found.');
+      const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+      const bcSheet = xlWb.Sheets['BC_Items'];
+      let bcItems = [];
+      if (bcSheet) {
+        const bcAoa = XLSX.utils.sheet_to_json(bcSheet, { header: 1, defval: null });
+        bcItems = bcAoa.slice(1).filter(r => r[0] && r[1]).map(r => ({ no: String(r[0]).trim(), desc: String(r[1]).trim(), cost: r[3] || null }));
+      }
+      const filename = filePath.split('/').pop();
+      wb = _parseWorkbook(aoa, filename);
+      wb.bcItems = bcItems;
+      wb._spPath = filePath;
+      selIdx = 0;
+      syncSet = new Set(wb.versions.map(v => v.label));
+      _populateBCDatalist(bcItems);
+      showScreen('app');
+      _updateUserChip();
+      el('hdr-wb').textContent = filename;
+      _setSaveStatus('Loaded from SharePoint');
+      const dd = el('sp-dropdown'); if (dd) dd.style.display = 'none';
+      _render();
+      loadProjects();
+    } catch(err) {
+      alert('Could not open workbook from SharePoint: ' + err.message);
     }
   }
 
@@ -2031,7 +2071,7 @@ const App = (() => {
   return {
     init, login, saveSetup, skipToLocalMode, saveSettings, openSettings,
     openLocalFile, openRecentWb, toggleWbDropdown,
-    toggleSpDropdown, spNavigateInto, spNavigateUp, openFromSharePoint, saveToSharePoint,
+    toggleSpDropdown, spNavigateInto, spNavigateUp, openFromSharePoint, openXlsxFromSharePoint, saveToSharePoint,
     loadProjects, loadAsanaTasks, onProjectChange, filterTasks,
     toggleSection, selectTask,
     selectVersion, toggleSyncVersion, openNewVersionModal, confirmNewVersion,
