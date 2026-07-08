@@ -2052,8 +2052,18 @@ const App = (() => {
     if (!account) { alert('Sign in with Microsoft first.'); return; }
 
     let path = wb._spPath;
+    // If opened from an Excel file, _spPath points to .xlsx/.xlsm — don't overwrite it with JSON.
+    // Clear the path so we fall through to the "save as new .json" prompt below.
+    if (path && /\.(xlsx|xlsm)$/i.test(path)) path = null;
+
     if (!path) {
-      const customer = wb.customer || prompt('Customer name (for the Formula Library folder):', '');
+      // Pre-populate customer from the Excel path when available (e.g., "Formula Library/FUKU/file.xlsx" → "FUKU")
+      let defaultCustomer = wb.customer || '';
+      if (!defaultCustomer && wb._spPath) {
+        const parts = wb._spPath.split('/');
+        if (parts.length >= 2) defaultCustomer = parts[parts.length - 2];
+      }
+      const customer = defaultCustomer || prompt('Customer name (for the Formula Library folder):', '');
       if (!customer) return;
       const productSlug = _slugify(wb.productName);
       path = `${SP_ROOT_PATH}/${customer}/${productSlug}.json`;
