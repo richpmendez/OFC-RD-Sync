@@ -1727,9 +1727,34 @@ const App = (() => {
       const newBlock     = _buildHtmlNotes(versionsToSync);
       Registry.setBlock(selectedTask.gid, productKey, productLabel, newBlock);
 
-      const blocks   = Registry.getTask(selectedTask.gid);
-      const combined = Object.values(blocks).map(b => b.html).join('<hr/>');
-      const htmlNotes = `<body>${combined}</body>`;
+      const blocks              = Registry.getTask(selectedTask.gid);
+      const combinedFormulation = Object.values(blocks).map(b => b.html).join('<hr/>');
+
+      // --- Fetch the current task description so we can splice rather than overwrite ---
+      const taskResp = await _asanaGet(
+        `https://app.asana.com/api/1.0/tasks/${selectedTask.gid}?opt_fields=html_notes`
+      );
+      if (!taskResp.ok) throw new Error('Could not fetch current task description (HTTP ' + taskResp.status + ')');
+      const taskData   = await taskResp.json();
+      const currentHtml = (taskData?.data?.html_notes || '<body></body>').trim();
+
+      // Strip the outer <body>…</body> wrapper so we can manipulate inner content
+      const bodyMatch  = currentHtml.match(/^<body>([\s\S]*)<\/body>$/i);
+      const bodyInner  = bodyMatch ? bodyMatch[1] : currentHtml;
+
+      // Match an existing Formulation section: from <h1/h2>Formulation</h1/h2>
+      // up to (but not including) the next <h1> or <h2>, or end of content.
+      const sectionPattern = /<h[12][^>]*>\s*Formulation\s*<\/h[12]>[\s\S]*?(?=<h[12][^>]*>|$)/i;
+      let newBodyInner;
+      if (sectionPattern.test(bodyInner)) {
+        // Replace only the Formulation section; everything else stays intact
+        newBodyInner = bodyInner.replace(sectionPattern, combinedFormulation);
+      } else {
+        // No existing Formulation section — append it
+        newBodyInner = bodyInner + combinedFormulation;
+      }
+
+      const htmlNotes = `<body>${newBodyInner}</body>`;
 
       // Validate XML locally before sending
       const xmlDoc = new DOMParser().parseFromString(htmlNotes, 'application/xml');
