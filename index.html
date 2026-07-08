@@ -984,8 +984,8 @@ const App = (() => {
       try {
         const data  = new Uint8Array(e.target.result);
         const xlWb  = XLSX.read(data, { type: 'array' });
-        const sheet = xlWb.Sheets['Bench Top'];
-        if (!sheet) throw new Error('No "Bench Top" sheet found.');
+        const sheet = _findBenchSheet(xlWb);
+        if (!sheet) throw new Error('No usable sheet found in workbook.');
         const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
 
         // Also read BC_Items if present
@@ -1026,6 +1026,18 @@ const App = (() => {
   }
 
   /* ── Excel parser ────────────────────────────────────── */
+  function _findBenchSheet(xlWb) {
+    // 1) Exact match
+    if (xlWb.Sheets['Bench Top']) return xlWb.Sheets['Bench Top'];
+    // 2) Case-insensitive / whitespace-tolerant match
+    const name = xlWb.SheetNames.find(n =>
+      n.trim().toLowerCase().replace(/\s+/g, '') === 'benchtop'
+    );
+    if (name) return xlWb.Sheets[name];
+    // 3) Fall back to first sheet
+    return xlWb.Sheets[xlWb.SheetNames[0]];
+  }
+
   function _parseWorkbook(rows, filePath) {
     const result = {
       customer: '', productName: '', createdOn: '',
@@ -2005,8 +2017,8 @@ const App = (() => {
     try {
       const buffer = await Graph.readBinary(filePath);
       const xlWb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
-      const sheet = xlWb.Sheets['Bench Top'];
-      if (!sheet) throw new Error('No "Bench Top" sheet found.');
+      const sheet = _findBenchSheet(xlWb);
+      if (!sheet) throw new Error('No usable sheet found in workbook.');
       const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
       const bcSheet = xlWb.Sheets['BC_Items'];
       let bcItems = [];
