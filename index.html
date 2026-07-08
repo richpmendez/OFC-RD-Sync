@@ -1332,7 +1332,7 @@ const App = (() => {
             <label>Batch (g)</label>
             <input type="number" value="${ver.batchWeight}" min="1"
               style="width:110px; padding:3px 7px; border:1.5px solid var(--border); border-radius:4px; font-size:12px;"
-              onchange="App.updateVerMeta('batchWeight', this.value)">
+              oninput="App.updateVerMeta('batchWeight', this.value)">
             <span style="margin-left:8px;">Total: <strong class="${pctOk ? '' : 'cell-err'}">${pctPct}%</strong>
             &nbsp;|&nbsp; <strong>${totalFBrix.toFixed(2)}°Bx</strong>
             &nbsp;|&nbsp; <strong>${totalRecipe.toLocaleString()} g</strong></span>
