@@ -1994,15 +1994,19 @@ const App = (() => {
         html += `<div class="sp-drop-empty">Empty folder</div>`;
       }
       folders.forEach(f => {
-        html += `<div class="sp-drop-item" onclick="App.spNavigateInto(decodeURIComponent('${encodeURIComponent(f.name)}'))">📁 ${_escHtml(f.name)}</div>`;
+        html += `<div class="sp-drop-item sp-nav-folder" data-name="${_escHtml(f.name)}">📁 ${_escHtml(f.name)}</div>`;
       });
       jsonFiles.forEach(f => {
-        html += `<div class="sp-drop-item" onclick="App.openFromSharePoint(decodeURIComponent('${encodeURIComponent(spBrowsePath + '/' + f.name)}'))">🧪 ${_escHtml(f.name.replace(/\.json$/i, ''))}</div>`;
+        html += `<div class="sp-drop-item sp-nav-json" data-path="${_escHtml(spBrowsePath + '/' + f.name)}">🧪 ${_escHtml(f.name.replace(/\.json$/i, ''))}</div>`;
       });
       xlsxFiles.forEach(f => {
-        html += `<div class="sp-drop-item" onclick="App.openXlsxFromSharePoint(decodeURIComponent('${encodeURIComponent(spBrowsePath + '/' + f.name)}'))">📊 ${_escHtml(f.name)}</div>`;
+        html += `<div class="sp-drop-item sp-nav-xlsx" data-path="${_escHtml(spBrowsePath + '/' + f.name)}">📊 ${_escHtml(f.name)}</div>`;
       });
       list.innerHTML = html;
+      // Attach click handlers via JS so special characters (apostrophes, etc.) in names are never a problem
+      list.querySelectorAll('.sp-nav-folder').forEach(d => d.addEventListener('click', () => spNavigateInto(d.dataset.name)));
+      list.querySelectorAll('.sp-nav-json').forEach(d => d.addEventListener('click', () => openFromSharePoint(d.dataset.path)));
+      list.querySelectorAll('.sp-nav-xlsx').forEach(d => d.addEventListener('click', () => openXlsxFromSharePoint(d.dataset.path)));
     } catch(e) {
       list.innerHTML = `<div class="sp-drop-error">Couldn't load: ${_escHtml(e.message || String(e))}</div>`;
     }
