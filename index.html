@@ -543,8 +543,9 @@ html, body { height: 100%; }
 </head>
 <body>
 
-<!-- datalist for BC item autocomplete (populated after workbook load) -->
+<!-- datalists for BC item autocomplete (populated from SharePoint bc-items.json) -->
 <datalist id="bc-items-dl"></datalist>
+<datalist id="bc-desc-dl"></datalist>
 
 <!-- ═══════════════════════════════════════════════ SETUP -->
 <div id="screen-setup" class="screen active">
@@ -794,6 +795,7 @@ const App = (() => {
   let msalApp    = null;
   let account    = null;
   let wb         = null;   // { customer, productName, overallStatus, asanaTaskUrl, versions[], filePath, bcItems[] }
+  let globalBcItems = [];  // Master BC ingredient list loaded from SharePoint _config/bc-items.json
   let selIdx     = 0;      // selected version tab index
   let syncSet    = new Set(); // version labels checked for sync
   let allTasks        = [];
@@ -818,6 +820,7 @@ const App = (() => {
       showScreen('app');
       _updateUserChip();
       loadProjects();
+      _loadBcItemsFromSharePoint();
     } else {
       showScreen('login');
       if (cfg.asanaPAT) loadProjects();
@@ -885,6 +888,7 @@ const App = (() => {
       showScreen('app');
       _updateUserChip();
       loadProjects();
+      _loadBcItemsFromSharePoint();
     } catch(e) {
       alert('Sign-in failed: ' + (e.message || e));
     }
@@ -1021,8 +1025,27 @@ const App = (() => {
   }
 
   function _populateBCDatalist(items) {
+    // Use global BC items (from SharePoint) if available, otherwise fall back to workbook items
+    const source = globalBcItems.length ? globalBcItems : items;
     const dl = document.getElementById('bc-items-dl');
-    dl.innerHTML = items.map(i => `<option value="${i.no}" label="${i.desc}">`).join('');
+    if (dl) dl.innerHTML = source.map(i => `<option value="${_escHtml(i.no)}" label="${_escHtml(i.desc)}">`).join('');
+    const descDl = document.getElementById('bc-desc-dl');
+    if (descDl) descDl.innerHTML = source.map(i => `<option value="${_escHtml(i.desc)}" label="${_escHtml(i.no)}">`).join('');
+  }
+
+  async function _loadBcItemsFromSharePoint() {
+    if (!_spConfigured() || !account) return;
+    try {
+      const data = await Graph.readJson('Formula Library/_config/bc-items.json');
+      const raw = Array.isArray(data) ? data : (data.value || []);
+      globalBcItems = raw
+        .filter(r => r.No && r.Description)
+        .map(r => ({ no: String(r.No).trim(), desc: String(r.Description).trim(), cost: r.Unit_Cost || null }));
+      _populateBCDatalist([]);
+      console.log(`[OFC] Loaded ${globalBcItems.length} BC items from SharePoint`);
+    } catch(e) {
+      console.warn('[OFC] BC items not loaded from SharePoint:', e.message);
+    }
   }
 
   /* ── Excel parser ────────────────────────────────────── */
@@ -1447,6 +1470,8 @@ const App = (() => {
         </td>
         <td>
           <input class="cell-in wide" value="${_escHtml(ing.description)}" style="min-width:150px;"
+            list="bc-desc-dl"
+            oninput="App.onDescInput(${idx},this.value)"
             onchange="App.updateIng(${idx},'description',this.value)">
         </td>
         <td>
@@ -1621,20 +1646,44 @@ const App = (() => {
     _refreshTotals(ver);
   }
 
+  function _bcLookup(key, field) {
+    // Search global items first, fall back to workbook items
+    const all = globalBcItems.length ? globalBcItems : (wb?.bcItems || []);
+    return all.find(b => b[field] === key.trim()) || null;
+  }
+
   function onItemNoInput(idx, value) {
-    // When user picks from BC datalist, auto-fill description
-    const bcItem = (wb?.bcItems || []).find(b => b.no === value.trim());
+    // When user picks an item # from the datalist, auto-fill description
+    const bcItem = _bcLookup(value, 'no');
     if (bcItem) {
       const ing = wb.versions[selIdx].ingredients[idx];
       if (ing) {
         ing.description = bcItem.desc;
-        if (bcItem.cost) ing.price = null; // BC-coded, Finance handles cost
+        if (bcItem.cost) ing.price = null;
         ing.isNew = false;
-        // Update the description input in DOM
         const row = document.getElementById('ing-row-' + idx);
         if (row) {
           const descInput = row.querySelectorAll('input')[1];
           if (descInput) descInput.value = bcItem.desc;
+        }
+        const pb = document.getElementById('preview-box');
+        if (pb) pb.textContent = _buildPlainText();
+      }
+    }
+  }
+
+  function onDescInput(idx, value) {
+    // When user picks a description from the datalist, auto-fill item #
+    const bcItem = _bcLookup(value, 'desc');
+    if (bcItem) {
+      const ing = wb.versions[selIdx].ingredients[idx];
+      if (ing) {
+        ing.itemNo = bcItem.no;
+        ing.isNew = false;
+        const row = document.getElementById('ing-row-' + idx);
+        if (row) {
+          const itemNoInput = row.querySelectorAll('input')[0];
+          if (itemNoInput) itemNoInput.value = bcItem.no;
         }
         const pb = document.getElementById('preview-box');
         if (pb) pb.textContent = _buildPlainText();
@@ -2130,7 +2179,7 @@ const App = (() => {
     selectVersion, toggleSyncVersion, openNewVersionModal, confirmNewVersion,
     updateWbMeta, updateVerMeta, updateIng, onItemNoInput,
     addIngredient, removeIngredient,
-    pushToAsana, removeFormulaFromTask, copyPreview,
+    pushToAsana, removeFormulaFromTask, copyPreview, onDescInput,
     openModal, closeModal
   };
 })();
