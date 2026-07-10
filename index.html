@@ -514,6 +514,24 @@ html, body { height: 100%; }
 .empty-main h3 { font-size: 15px; font-weight: 700; color: var(--text); }
 .empty-main p { font-size: 12px; line-height: 1.5; }
 
+/* Empty state cards */
+.empty-cards {
+  display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 8px;
+}
+.empty-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  background: var(--surface); border: 2px solid var(--border);
+  border-radius: 10px; padding: 24px 20px; width: 160px;
+  cursor: pointer; transition: border-color .15s, box-shadow .15s;
+  text-align: center;
+}
+.empty-card:hover {
+  border-color: var(--accent); box-shadow: 0 2px 12px rgba(0,0,0,.15);
+}
+.empty-card-icon { font-size: 28px; }
+.empty-card-title { font-size: 12px; font-weight: 700; color: var(--text); }
+.empty-card-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+
 /* Modal */
 .modal-overlay {
   display: none; position: fixed; inset: 0;
@@ -671,11 +689,25 @@ html, body { height: 100%; }
         <div class="empty-main">
           <div class="icon">🧪</div>
           <h3>Formula Workbench</h3>
-          <p>Open a bench top workbook to start editing formulas<br>and syncing to Asana tasks.</p>
-          <label class="btn btn-primary" style="cursor:pointer;">
-            📁 Open Local Workbook
-            <input type="file" accept=".xlsx,.xlsm" style="display:none" onchange="App.openLocalFile(this)">
-          </label>
+          <p>Choose how you'd like to get started.</p>
+          <div class="empty-cards">
+            <label class="empty-card" style="cursor:pointer;">
+              <div class="empty-card-icon">📁</div>
+              <div class="empty-card-title">Open Local Workbook</div>
+              <div class="empty-card-desc">Load an Excel bench-top file from your computer</div>
+              <input type="file" accept=".xlsx,.xlsm" style="display:none" onchange="App.openLocalFile(this)">
+            </label>
+            <div class="empty-card" onclick="App.toggleSpDropdown()">
+              <div class="empty-card-icon">☁️</div>
+              <div class="empty-card-title">Open from Formula Library</div>
+              <div class="empty-card-desc">Browse and open a formula saved in SharePoint</div>
+            </div>
+            <div class="empty-card" onclick="App.openNewFormulaModal()">
+              <div class="empty-card-icon">✨</div>
+              <div class="empty-card-title">New Formula</div>
+              <div class="empty-card-desc">Create a new formula from scratch and save to SharePoint</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -724,6 +756,32 @@ html, body { height: 100%; }
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="App.closeModal('modal-newver')">Cancel</button>
       <button class="btn btn-primary" onclick="App.confirmNewVersion()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-newformula" class="modal-overlay">
+  <div class="modal">
+    <h2>✨ New Formula</h2>
+    <p class="modal-sub">Creates a blank formula and saves it to the Formula Library on SharePoint.</p>
+    <div class="form-group">
+      <label>Customer</label>
+      <select id="nf-customer-select" onchange="App.onNewFormulaCustomerChange(this.value)">
+        <option value="">Loading folders…</option>
+      </select>
+      <input type="text" id="nf-customer-new" placeholder="New customer name" style="display:none; margin-top:8px;">
+    </div>
+    <div class="form-group">
+      <label>Product Name</label>
+      <input type="text" id="nf-product" placeholder="e.g. Strawberry Puree RFR">
+    </div>
+    <div class="form-group">
+      <label>Initial Version Label</label>
+      <input type="text" id="nf-version" placeholder="e.g. v1.0" value="v1.0">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="App.closeModal('modal-newformula')">Cancel</button>
+      <button class="btn btn-primary" onclick="App.confirmNewFormula()">Create &amp; Save</button>
     </div>
   </div>
 </div>
@@ -821,6 +879,8 @@ const App = (() => {
       _updateUserChip();
       loadProjects();
       _loadBcItemsFromSharePoint();
+      const lastPath = localStorage.getItem('ofc_last_sp_path');
+      if (lastPath) openFromSharePoint(lastPath);
     } else {
       showScreen('login');
       if (cfg.asanaPAT) loadProjects();
@@ -1930,6 +1990,68 @@ const App = (() => {
     });
   }
 
+  /* ── New Formula flow ───────────────────────────────── */
+  async function openNewFormulaModal() {
+    // Populate customer dropdown from existing SP folders
+    const sel = el('nf-customer-select');
+    sel.innerHTML = '<option value="">Loading…</option>';
+    el('nf-customer-new').style.display = 'none';
+    el('nf-product').value = '';
+    el('nf-version').value = 'v1.0';
+    openModal('modal-newformula');
+
+    if (_spConfigured() && account) {
+      try {
+        const items = await Graph.listFolder(SP_ROOT_PATH);
+        const folders = items.filter(i => i.folder && !i.name.startsWith('_'));
+        sel.innerHTML = folders.map(f => `<option value="${_escHtml(f.name)}">${_escHtml(f.name)}</option>`).join('');
+        sel.innerHTML += '<option value="__new__">＋ New customer folder…</option>';
+        if (!folders.length) sel.innerHTML = '<option value="__new__">＋ New customer folder…</option>';
+      } catch(e) {
+        sel.innerHTML = '<option value="__new__">＋ New customer folder…</option>';
+      }
+    } else {
+      sel.innerHTML = '<option value="__new__">＋ New customer folder…</option>';
+    }
+  }
+
+  function onNewFormulaCustomerChange(value) {
+    const newInput = el('nf-customer-new');
+    newInput.style.display = value === '__new__' ? 'block' : 'none';
+    if (value === '__new__') newInput.focus();
+  }
+
+  async function confirmNewFormula() {
+    const selVal    = el('nf-customer-select').value;
+    const customer  = selVal === '__new__' ? el('nf-customer-new').value.trim() : selVal;
+    const product   = el('nf-product').value.trim();
+    const verLabel  = el('nf-version').value.trim() || 'v1.0';
+
+    if (!customer) { alert('Enter a customer name.'); return; }
+    if (!product)  { alert('Enter a product name.'); return; }
+
+    const today = new Date().toLocaleDateString('en-US', { month:'2-digit', day:'2-digit', year:'2-digit' });
+    wb = {
+      customer, productName: product,
+      createdOn: today, asanaTaskUrl: '', overallStatus: 'Draft',
+      filePath: '', bcItems: [],
+      versions: [{
+        label: verLabel, status: 'Draft', batchWeight: 1000,
+        costModel: 'Pending', testedBrix: null, testedPh: null, testedVisc: null,
+        ingredients: []
+      }]
+    };
+    selIdx  = 0;
+    syncSet = new Set([verLabel]);
+    closeModal('modal-newformula');
+
+    // Save immediately to SharePoint so the file/folder exist
+    await saveToSharePoint();
+    showScreen('app');
+    _render();
+    loadProjects();
+  }
+
   /* ── Modal helpers ───────────────────────────────────── */
   function openModal(id)  { el(id)?.classList.add('open'); }
   function closeModal(id) { el(id)?.classList.remove('open'); }
@@ -2036,7 +2158,7 @@ const App = (() => {
       if (spBrowsePath !== SP_ROOT_PATH) {
         html += `<div class="sp-drop-back" onclick="App.spNavigateUp()">⬅ Back</div>`;
       }
-      const folders = items.filter(i => i.folder);
+      const folders = items.filter(i => i.folder && !i.name.startsWith('_'));
       const jsonFiles = items.filter(i => i.file && i.name.toLowerCase().endsWith('.json'));
       const xlsxFiles = items.filter(i => i.file && (i.name.toLowerCase().endsWith('.xlsx') || i.name.toLowerCase().endsWith('.xlsm')));
       if (!folders.length && !jsonFiles.length && !xlsxFiles.length) {
@@ -2078,6 +2200,7 @@ const App = (() => {
       const data = await Graph.readJson(filePath);
       wb = data;
       wb._spPath = filePath;
+      localStorage.setItem('ofc_last_sp_path', filePath);
       selIdx = 0;
       syncSet = new Set((wb.versions || []).map(v => v.label));
       _populateBCDatalist(wb.bcItems || []);
@@ -2110,6 +2233,7 @@ const App = (() => {
       wb = _parseWorkbook(aoa, filename);
       wb.bcItems = bcItems;
       wb._spPath = filePath;
+      localStorage.setItem('ofc_last_sp_path', filePath);
       selIdx = 0;
       syncSet = new Set(wb.versions.map(v => v.label));
       _populateBCDatalist(bcItems);
@@ -2157,6 +2281,7 @@ const App = (() => {
       delete payload._spPath; // internal-only, don't persist
       await Graph.writeJson(path, payload);
       wb._spPath = path;
+      localStorage.setItem('ofc_last_sp_path', path);
       _setSaveStatus('Saved ' + new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}));
     } catch(e) {
       _setSaveStatus('');
@@ -2180,7 +2305,8 @@ const App = (() => {
     updateWbMeta, updateVerMeta, updateIng, onItemNoInput,
     addIngredient, removeIngredient,
     pushToAsana, removeFormulaFromTask, copyPreview, onDescInput,
-    openModal, closeModal
+    openModal, closeModal,
+    openNewFormulaModal, onNewFormulaCustomerChange, confirmNewFormula
   };
 })();
 
