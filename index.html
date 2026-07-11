@@ -6,6 +6,7 @@
 <title>OFC Formula Sync — Bench to Asana</title>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/docx@8/build/index.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Barlow+Condensed:wght@700;800&display=swap" rel="stylesheet">
@@ -650,6 +651,7 @@ html, body { height: 100%; }
         </div>
       </div>
       <button class="btn btn-secondary btn-sm" id="btn-save-sp" onclick="App.saveToSharePoint()" title="Save current formula to SharePoint">💾 Save</button>
+      <button class="btn btn-secondary btn-sm" id="btn-spec-sheet" onclick="App.openSpecSheetModal()" title="Generate customer spec sheet">📄 Spec Sheet</button>
       <button class="btn btn-secondary btn-sm" onclick="App.openSettings()">⚙</button>
       <span class="user-chip" id="hdr-user"></span>
     </span>
@@ -756,6 +758,150 @@ html, body { height: 100%; }
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="App.closeModal('modal-newver')">Cancel</button>
       <button class="btn btn-primary" onclick="App.confirmNewVersion()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-specsheet" class="modal-overlay">
+  <div class="modal" style="max-width:600px; max-height:90vh; overflow-y:auto;">
+    <h2>📄 Generate Spec Sheet</h2>
+    <p class="modal-sub">
+      <strong id="ss-product-name"></strong> &mdash; <span id="ss-product-line" style="color:var(--text-muted);"></span>
+    </p>
+
+    <div style="background:var(--yellow-light); border:1px solid var(--yellow-dark); border-radius:4px; padding:8px 12px; margin-bottom:14px; font-size:11px;">
+      <strong>INGREDIENTS (auto-built from formula, descending by weight):</strong><br>
+      <span id="ss-ingredients-preview" style="color:var(--text-muted);"></span>
+    </div>
+
+    <div class="form-group">
+      <label>Item Number</label>
+      <input type="text" id="ss-item-number" placeholder="e.g. BL391 or TBD">
+    </div>
+    <div class="form-group">
+      <label>GTIN / UPC</label>
+      <input type="text" id="ss-gtin" placeholder="e.g. 041345001234 or TBD">
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;justify-content:space-between;">Description <button type="button" class="btn btn-sm" style="font-size:10px;padding:2px 7px;" onclick="App.fillDescriptionDefault()">Use default ↓</button></label>
+      <textarea id="ss-description" rows="3" placeholder="e.g. Strawberry puree is mixed with a thickened, sweetened sauce and pasteurized…" style="width:100%; resize:vertical; padding:6px 8px; border:1.5px solid var(--border); border-radius:4px; font-size:12px; font-family:inherit;"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Country of Origin</label>
+      <select id="ss-country">
+        <option value="domestic and imported">Domestic and imported</option>
+        <option value="imported">Imported</option>
+        <option value="USA">USA only</option>
+      </select>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div class="form-group">
+        <label>Brix Min (°)</label>
+        <input type="number" id="ss-brix-min" step="0.1" placeholder="e.g. 28.0">
+      </div>
+      <div class="form-group">
+        <label>Brix Max (°)</label>
+        <input type="number" id="ss-brix-max" step="0.1" placeholder="e.g. 33.0">
+      </div>
+      <div class="form-group">
+        <label>pH Min</label>
+        <input type="number" id="ss-ph-min" step="0.01" placeholder="e.g. 2.50">
+      </div>
+      <div class="form-group">
+        <label>pH Max</label>
+        <input type="number" id="ss-ph-max" step="0.01" placeholder="e.g. 3.40">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Viscosity</label>
+      <input type="text" id="ss-viscosity" placeholder="e.g. 14 - 20 cm/10 sec (Bostwick at 68–72°F)">
+    </div>
+    <div id="ss-row-specific-gravity" class="form-group" style="display:none;">
+      <label>Specific Gravity</label>
+      <input type="text" id="ss-specific-gravity" placeholder="e.g. 1.040 – 1.070">
+    </div>
+    <div class="form-group">
+      <label>Color</label>
+      <input type="text" id="ss-color" placeholder="e.g. Red, typical of strawberries">
+    </div>
+    <div class="form-group">
+      <label>Flavor</label>
+      <input type="text" id="ss-flavor" placeholder="e.g. Tart and sweet, typical of ripe strawberries">
+    </div>
+    <div id="ss-row-aroma" class="form-group" style="display:none;">
+      <label>Aroma</label>
+      <input type="text" id="ss-aroma" placeholder="e.g. Typical of tropical mango; free of rancid, musty, and objectionable odors">
+    </div>
+    <div id="ss-row-piece-size" class="form-group" style="display:none;">
+      <label>Piece Size</label>
+      <input type="text" id="ss-piece-size" placeholder="e.g. Chunky pieces should pass through a 6.0 mm straw">
+    </div>
+
+    <!-- Aseptic-only fields -->
+    <div id="ss-row-defects" class="form-group" style="display:none;">
+      <label>Defects</label>
+      <input type="text" id="ss-defects" placeholder="e.g. Free from foreign material, including insect and rodent damage">
+    </div>
+    <div id="ss-row-pack-format" class="form-group" style="display:none;">
+      <label>Pack Format</label>
+      <select id="ss-pack-format">
+        <option value="drum">Drum (55 gal / 208 L)</option>
+        <option value="tote">IBC Tote (275 gal / 1040 L)</option>
+        <option value="both">Drum and IBC Tote</option>
+      </select>
+    </div>
+    <!-- Cocktail Cherries only -->
+    <div id="ss-row-pits-stems" class="form-group" style="display:none;">
+      <label>Pits / Stems</label>
+      <input type="text" id="ss-pits-stems" placeholder="e.g. Machine pitted. Not to exceed more than one pit per 20 lb.">
+    </div>
+    <!-- Canned Fruit only -->
+    <div id="ss-row-ing-prior-pkg" class="form-group" style="display:none;">
+      <label>Ingredient Prior to Packaging (%)</label>
+      <input type="text" id="ss-ing-prior-pkg" placeholder="e.g. Strawberries 70%, Water 25%, Sugar 5%">
+    </div>
+    <div id="ss-row-can-specs" style="display:none; margin-bottom:10px;">
+      <div style="background:var(--bg-light); border:1px solid var(--border); border-radius:4px; padding:8px 12px;">
+        <div style="font-weight:600; font-size:12px; margin-bottom:4px;">Can Specifications (line constants)</div>
+        <div style="font-size:11px; color:var(--text-muted);">
+          Center Temp after retort: ≥ 200°F &nbsp;·&nbsp; Vacuum: 2–8 in Hg &nbsp;·&nbsp; Headspace: 3/16 – 3/8 in
+        </div>
+      </div>
+    </div>
+
+    <div id="ss-row-weights" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div class="form-group">
+        <label>Gross Ship Weight</label>
+        <input type="text" id="ss-gross-wt" placeholder="e.g. 15.16 lb (6.88 kg)">
+      </div>
+      <div class="form-group">
+        <label>Net Weight</label>
+        <input type="text" id="ss-net-wt" placeholder="e.g. 14.16 lb (6.42 kg)">
+      </div>
+    </div>
+
+    <div id="ss-row-days-after-opening" class="form-group" style="display:none;">
+      <label>Days After Opening (refrigerated)</label>
+      <input type="number" id="ss-days-after-opening" placeholder="e.g. 30">
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="App.closeModal('modal-specsheet')">Cancel</button>
+      <button class="btn btn-primary" onclick="App.showSpecSheetSummary()">Review &amp; Generate →</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-specsheet-confirm" class="modal-overlay">
+  <div class="modal" style="max-width:600px; max-height:90vh; overflow-y:auto;">
+    <h2>📋 Confirm Spec Sheet</h2>
+    <p class="modal-sub">Review all fields before generating. Click Back to edit.</p>
+    <div id="ss-confirm-body" style="font-size:12px; line-height:1.6;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="App.backToSpecSheet()">← Back</button>
+      <button class="btn btn-primary" onclick="App.finalizeSpecSheet()">Generate &amp; Download</button>
     </div>
   </div>
 </div>
@@ -1433,12 +1579,20 @@ const App = (() => {
           <label>Product</label>
           <input class="cell-in wide" value="${_escHtml(wb.productName)}" onchange="App.updateWbMeta('productName',this.value)" style="min-width:200px;">
         </div>
-        <div class="pi-field">
+        <div class="pi-field" style="position:relative;">
           <label>Product Line</label>
           <select class="cell-in" onchange="App.updateWbMeta('productLine',this.value)" style="min-width:180px;">
             <option value="">— Select —</option>
             ${PRODUCT_LINES.map(l => `<option value="${_escHtml(l)}"${wb.productLine === l ? ' selected' : ''}>${_escHtml(l)}</option>`).join('')}
           </select>
+          <button type="button" onclick="App.toggleLineHelp(this)" style="margin-left:6px;font-size:10px;padding:2px 7px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-muted);" title="Help choosing a product line">❓ Help</button>
+          <div class="line-help-panel" style="display:none;position:absolute;z-index:300;left:0;top:calc(100% + 4px);background:var(--white);border:1.5px solid var(--border);border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,0.15);padding:14px 18px;width:340px;font-size:11px;line-height:1.5;">
+            <div style="font-weight:700;font-size:12px;margin-bottom:8px;">Which product line is this?</div>
+            <div style="margin-bottom:4px;"><strong>Frozen</strong></div>
+            <div style="margin-left:12px;color:var(--text-muted);">Whole/diced pieces in sauce → <strong>Frozen Diced Pourable Fruit</strong><br>Smooth purée/sauce → <strong>Frozen Smooth Pourable Fruit</strong><br>Large pieces in gel/sauce → <strong>Frozen Compote</strong></div>
+            <div style="margin:6px 0 4px;"><strong>Shelf Stable / Aseptic</strong></div>
+            <div style="margin-left:12px;color:var(--text-muted);">Smooth pourable sauce (BIB/bottle) → <strong>Shelf Stable Smooth Pourable Fruit</strong><br>Juice / drink concentrate → <strong>Shelf Stable Beverage Concentrate</strong><br>Aseptic drum/tote fill → <strong>Aseptic Purée</strong><br>Metal cans → <strong>Canned Fruit</strong><br>Cherries in syrup/solution → <strong>Cocktail Cherries</strong></div>
+          </div>
         </div>
         <div style="margin-left:auto; font-size:10px; color:var(--text-muted);">${_escHtml(wb.filePath)}</div>
       </div>
@@ -2014,7 +2168,706 @@ const App = (() => {
     });
   }
 
-  /* ── New Formula flow ───────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   PHASE 3 — SPEC SHEET GENERATOR
+   All 8 OFC product lines. Uses docx@8 loaded from CDN.
+   ══════════════════════════════════════════════════════════════ */
+
+  const OFC_LOGO_B64 = 'iVBORw0KGgoAAAANSUhEUgAABQEAAAHqCAYAAAC0tog+AAAACXBIWXMAAAsSAAALEgHS3X78AAAgAElEQVR4nOzd3XEbSZb28Scn+p56I/aeGAvEsYDVFohjAdEWNGYdENqBbcqCBi0YyoIuWtCkBQPeb8SKFuR7UUkJokASH1V5MvP8fxGK/hT5CEShsk6ezAwxRgEAAAAAAOB7IYROkmKMvW0S4Hh/sw4AAAAAAABQqE7STQjhnXUQ4FgUAQEAAAAAAF52ImlhHQI4FkVAAAAAAACA130MIcysQwDHoAgIAAAAAADwtivrAMAxKAICAAAAAAC87cPTQSFAjSgCAgAAAAAA7IZuQFSLIiAAAAAAAMBu3ocQ5tYhgENQBAQAAAAAANjdVQjhnXUIYF8UAQEAAAAAAHZ3ImlhHQLYF0VAAAAAAACA/XwMIcysQwD7oAgIAAAAAACwv5V1AGAfFAEBAAAAAAD2dx5C6KxDALuiCAgAAAAAAHCYlXUAYFcUAQEAAAAAAA5zGkLgkBBUgSIgAAAAAADA4ZYhhHfWIYC3/GQdALtJHyhnG//qTNIuHzJfJN1t/PNdjPHLmNkAAAAwvnTq5GzjXx06/lvHGNdj5QJKFULYvEZm+v76eck6/ZIkxRj7cVPBiRNJS0l0BKJoFAELkjYUnaVfTzewMw0fKGN+H0l61DA4fBokrjUMEPsxvxcAAAC225jkfRr3dek/nU/wvZ7+9jb99Wkc2Ev6EmO82/LbgKK8cM28k/R+xO/x9Lf3+v5Z6U40VOB1v4YQrph0QclCjNE6g0up4Nfp203s1DLPMw9KNzlJPYVBAACA42wULzqVOf6ThqLH0xjwjjEgrKVnps3rpoRrhmclZ0IIS0kfd/zfb2OM3XRpgONQBMwk3cAuNNzARpupyuhWw0wxNzoAAIAdhBCexn6d6hz/SUNhsNe3cSBdUJhMWs7bpV8fTMPs51bSjYZrhK7axuxZBJSkn3lmRqkoAk4kzfZepF813cB28ahhIHgj6YbBIAAAwNc9/J4Kf62N/548FQVveMjFGFLhb67h2imh0+9YDxqek1YUBNtwQBHwIcY4myYNcByKgCPaKPwtVO9s7yE+i4IgAABwaKPwN5ev8Z80TAzf6FtRkHEgdpKum4XaKfy95KkgyD5xFTugCChJ/4oxXk0QBzgKRcARpKUec7U747uPaw2DwBvrIAAAAFMJIczV5oqPY3zW0P3EOBBbpetmrgkOv6nAvYZi4Mo6CPZzYBHwUdKMyRGUhiLggVLX30LDTazl2atDPUhaabjR8cEHAACqt9G9NJd0YpmlcE8dglcsh8TGc9NCXDfScH1cieekahxYBJSkTzHGxchxgKNQBNxTGvwtJV2aBqnLtaQlLfBtS4ff/GmdozGPGk6ee9Knv67Try88XLUrhMANGtv8nftpfuketxBdf4e411DwYLmwMxvPTRei+PcSnpMqcEQRUJL+wXi9Pkf+zItGEXBHafC3lM/W9bFca1gi0lsHwfgoApp60FAUvEu/1lxn9aMIiC3YaDyztOXLQoz/xvCob6tE1rZRMKXU+Xclmib2QTGwYEcWhG5jjN14aZBDy0XAv1kHKF0IoQsh9BqKGwwAj3Mp6c8QQp9mBgGM41TD59Ovkv7QcJ3FEMJdCGEVQpink/cA1K23DuBFGv+tJf1bjP/GcqLhPvWfdG/ivtSYEMK79OC8FgXAfV1quDaWqYiKdpynCSWgCBQBXxBCmIUQVqL4N4VzfRsAzoyzAC17r2FQ+Yekv0IIX0IIN6koODNNBuAQHLYwsWeTv+z5PJ1LDfelPq0kQOXSgR9rDZ0zLP093EdJ6/R6oh2cEoxiUAR8ZmMG6z9iBmtql5LumPECsjnRsJ/VHxoK8XchhCu6MYBq9NYBWpUmf2/E5G9u52KVSNVCCGepcP6HKP6N5UTSH2mcxhitDaepxgCYowi4IbXprtXo2u9CnWh4ve9okwaye69hadZfIYQ1BUGgaPccqjC+Z5O/HPphh1UiFUrXzl+icD6V9xrGaFc0TDRhwc8RJaAIqK+zv72GfV+YwbJxKunfaanizDgL4NGpvhUE70IIDFSAsrAUeGRp8vFOTP6W5OsqEesgeFnq/uPayedXDdcFE7V1OxHLglEA90XAEMJCwwCQGawyfNBwk1tYBwEcey/pd0n/x+btQDF66wCtSN1/Nxomf9n3rzwnkj6mDvXOOgy+t9H99944ijenGiZql9ZBcJRLxtWw5rYIuNH997vo/ivNiaTf0/4wdCIBtti8HbD3GGPsrUO0YGPrF5b+lu9Uw36BN4wH7aXieS+6/6x9ZA/N6tENCFMui4Abyz/o/ivbuYbTsdgrELC3uXl7Zx0GcKa3DlC7Z91/TP7W5YOG8WBnHcSr1Lm0Fs9OpTjXsHKqsw6Cg5zzfAtLroqAaQC4EgPAmpxo2CuQGROgDBQDgfx66wA1SwWMO9H9V7MTDSc3I7MQwlzD8l+encpyomE8xhZKdeLZFmbcFAFTy3SvYWkb6vNrOqxgZh0EgKTvi4Ez4yxA6zgU5EDpAfkvsfdfC+6tA3iTmif+sM6BV/2efk6oyyn7O8KKiyJg6la5ExvY1u69aH0HSnMu6T8hhCV7NgGTeIgxrq1D1GZj+e/v1lkwGorhmWzs/0fzRB0uU7ME47C6LPiZwULzRcA0A/ynaGFvxVPr+9w6CIDvfBRFemAKFD72lJb/9mL5b2t66wAepKJEL/b/q817SazOqMuJWBYMA00XAVNrNDPAbfqD1negOJzkCIyvtw5QkzQR0YvVH63hhOwMNvbP5Pqp09OqqTPrINjZJT8v5NZkEZAWdjcuQwgrig1AcT6IrkBgLL11gFqkVQKs/mhTbx2gdRsdtOyfWbcTDR2BFJbqQTcgsmquCEgLuzuXGm50FAKBsjx1BS6tgwAVu40xfrEOUYP0WcMBBu3qrQO0bKMASAG9DRQC63LOVlfIqaki4EYBkBZ2X572wKAQCJTnYzpBmOsT2F9vHaAGaXuQj9Y5MCn2xpwIBcBmUQisCwfsIZtmioDsYeEehUCgXOdijxrgEBQ+3pAKgGz/0jZOyJ4IBcDmUQisx6mkhXUI+NBEEZA9LJBQCATKdarh+rywDgJU4jHGeGcdomQUAN3orQO0KI2Xb0QBsHVPhcCZcQ68bcHPCTlUXwRkBgvPUAgEynUi6d/sewLspLcOUKp0ANydKAB6QUfsyDa2UKKBwocTSTc8HxXvRNLSOgTaV3URkBksvIBCIFC2PygEAm+i8PGyldj+xZPeOkCDenENecPzUR0uQwiddQi0rdoiIDNYeAM3OqBsf6SlfAC2660DlCh9bnywzoFs7jkhe1zpGqIA6NN7SVfWIfCmpXUAtK3KIiCnAGNHFAKBsl1SCAS24iCELdgD0CU6YkcUQliIa8i7yxDC0joEXnXOihlMqcoioIYBAQVA7IIZL6Bsl+mhBMA3FD6eoQDoVm8doBXpYK7frXOgCB8pMhVvSSMLplJdETANAs+tc6AqdBsBZfudwSjwnd46QEnoXnLrMcbYW4doQTpxdGWbAoW5SgdsokynkpgkxySqKgIyCMQRLikyAEXjsBDgm946QCnS5wLdSz711gFawEGKeMGJpBXdZkVbpAI+MKpqioC0sGMEf3DaElA0ZqUB6ZaDEAbp8+AP6xww01sHaMRSbKOE7dg2qWwn4pAQTKCKImAaBK6sc6AJNxQZgGKdiMN8gN46QAlS90NvmwLG2BvzSKmJ4lfrHCgaq6XKdkkTC8ZWfBEwPQyuRAs7xkHrO1C2E/HgD9/cFz5YvghxQvbR2AcQe7hi2WnR6NbEqIovAmq4edHCjjHR+g6U7T2H+cCpxxjjnXWIAlyJsZ93vXWABqxEIR27ORETUCV7T7cmxlR0ETAdBPLBOgeadJneXwDKdJmWMQGe9NYBrHEIHBIKEkdI19G5dQ5U5X0IYWkdAi+6YiUbxlJsETDt28ZBIJjS7+wPCBRtxfIUOOO68MHYDxt66wC1SvfNpW0KVOojz0bFOpFEAwtGUWQRcGMvGGBqN8yqAMU6EfsZwZfeOoAVxn7YwAnZx1mJZcA43Mo6AF70kclxjKHIIqCGD59T6xBw4VTsDwiU7Jyl+3Di3vlBCCsx9sOgtw5QK5YBYwTvGXcVjedWHK24ImDaA4p9AJETe48BZVsy8wkHeusAVtgDGs/QEXqA1E27tM6BJjDuKteHEEJnHQJ1K6oIyFH2MLRiWTBQLJYFw4PeOoAF9i/DM5yQfbgrsQwY4zgRHWcl42eDoxRVBBR7WMAORQagbOd07KJlMUav3U83YuyHb3rrADVKnUGcqo0x0XFWrvchhLl1CNSrmCIge1igAB8oMgBFu6JjF426tQ5gIYSwlPTeOgeK4rUYfiw6gzCFlXUAvIgxMQ5WRBGQPSxQEJYFA+U6lcRm1WiRu8JHWgb80TgGytNbB6hN6giimI4pnHJISLFOxJgYByqiCCiWAaMc7IEBlG3BZtVoUG8dwMDKOgCK8+D8hOy90UiBDJY0SBTrI2NiHMK8CJj2GuBEOJTkkj0wgGKdiAcetMXdQQhsAYMXuOuIHcFCQ5c8MBU6zspG8wr2ZloETLMKK8sMwAtW1gEAvOiSmU80xFXhg84lvKK3DlCTdC1RnEEOdJyViwNcsLefjL8/s1co1WkIYRljXFoHAbDVUtLcOAMwht46QGZXYguYMd1L+vLCfztTXa91bx2gMgvV9fO19ChpW8d1bdeIpaUYd5XqSsN7GdhJiDHafONhNuE/Jt8c2M2jpDP2p9lNmoX60zoHXPl7y9dnCMHmBo3cmn4fb+I+cbCnAkaf/rreZwl5COFM0kzDQ2KnMgsftzHGzjpELXiOetWjhmull3QXY+zf+g3ps+np+uhU3vVRCjf3q+fSafYlH2b1rxgjS4NHVMHP/GCWnYC8SVG6p73H5rYxALxgKa5P1O3e2QMVY7/d3WtYKn5z7J6R6fffaWPpeSoMXqRfJZws21sHqMzSOkCBbiWtYoyrfX9jKhT2Sp9RIYQLDeML9q3/3lKMu0q1DCGsYowvdYYDX5l0AjITjMr8vMssoneNX9evLbc6xjuV8fBVs//X6oCHTkAXPsUYXezpFUKYS/rDOkfhHjTsSbzKWRxOXWVPRQ+re9I/vB2Qc6i0F+D/WecoyLWk5RTXTLo2lpIux/7aFXPZDVhJV5ibMUUOlfzMD2LVCbg0+r7AIZYalgbAr8XUheDUlfFOw3ttlv7KnqlvW4h7CurVWwfIIRUt6AJ82cEdTGNID/RXkq7SvWihvEUPdydkH4mH/MG9Jh6fpWtjHkK40nCNcKo53YAl+zWEcOWxSIv9ZC8CpplgPkBRk/MQwkWM0dUJjshr4wGof/p36cH5QkNB8ELsUbPNXBQBa/MgaW0dogSO7iscYLDd5EWMfaV70TyEsNDwc8vxs+sn/vrN4ETgr37LeXhfui66dF38nuv7FuoyHZ64tg6CrVaieQVvsOgEXBp8z9Y8PUDd6dsSxX7jv3fpr+80bHI7Ex1Fx7rSxl46QA5pmesq/WKPmu1OQwhzqw4aHGTFyet+pOV0FC2+96ih+LeyDvKSdP9Zpg6oqYuBjK92572g/iips+ocjTFehRB6De9Zz89Wc/FMX6rzEEJX0uQSypO1CJi6AD1/YB7qQcPNppfU77D/Vf/8X6SZw07fOor4OeyHQgPMpa6hG/ao+cFcqVAKoDhL+S5aPPdZ0ryWvUy3FAOn2B+pn+BrtspzQf1eQwHQ9NqJMd6lZfO9/O7rvEjLTqv4HHNopaEJCNjqb7m+EfvB7O1R0icNGyXPYoyLGOPNoR+2McYv6fcvYowzSf/QsJHu43iRm7e0DgBIwx41Mca5pL9ruI69O0+FUQAFSdclkxWDR0n/jDFe1PjgnMaRSw33nc8jfukHlhXuJjVTeC2oF1EAfJJydPI7BjsR+wKW7DQtXQe2ylYEFO3ru3qQ9C9JT4W/SdrdY4x3qYgwk/SbKAbu4jQNwIAibBQDf9YwQPZsbh0AwA+W1gEKca9hXFf9std037nQcN95GOFLVv+aZOT1ob6oAuCTVBify28h0Ov7sRbL1IQF/CBLEZBNbHfyqGGT21mMMVt79cbM7kwUA3extA4APJf2/eg0dA97NbcOAOAbugC/uo4xnpVWwDhWjLFPK0t+O/JL9cenaV8IoZPPpadFFgA3pUKgx4nY07RXNcp0Ip5b8YJcnYB0Ab7us4YZ4qVVgI1i4JnGXebRGroBUaR0DS8k/SKfxfzTtEcPgDIsrQMU4F+pQNCsNHb8hw4sgrTQHZnJ3DqAgeILgBs6+SwE0uRTtl/ZLgfb5CwC4kfF7Q+zsczDayFhF0vrAMBL0uE1nXxev3PrAADoAkx+iTG62As7bTFzpv270W+nyNMap9fTo+o7QOdC/sZe7MlcvpV1AJRn8iKg801sX3Mv6azUGdCNQoLHWa230A2IoqW9RDv5G4yyLAUow9I6gLFf0jjKldSN/k/tfu8pcgxcoLl1AAPzqfZFn0o64MbjOIRmn7Kdp+0EgK9ydAIuM3yP2lxraG9fWwd5zUYhgeXBP1paBwBe47QQyJJgwJjTrqVNLguAT9Lk9pl2m0Tup03TjLl1gMw+ldok8Za0R7O3/Znn1gHwppV1AJRl0iJg6pY6nfJ7VOg6xlhVe3taHuz15KuXsBkuiue0EDi3DgA457krxHUB8EnaWuZMr48dH2vr9LKQOng8PUs9qPKJ9tQR62kl1QnPRMU7DSEsrUOgHFN3AnoeCG7zW60bRKfcFAK/x/sbxUsPWZ7eq511AMCrEMI7+S3Ef6IA+L00dvzlhf9cZaeXgbl1gMyqaZR4w9w6QGZz6wB40yLdo4HpioCOj7J/ySfL03/HQCHwB+csPUQN0oOpl+Up79mkGjAzl899oD+n7h88k+4/P+vHjvQ+e5jKpAd2T0vrP6XltNVLE7C/WefI6AMFpuKdSHJxWBXeNmUnIIOhb65bGRxSCPxBEz9XuLCUn+UpnXUAwCmP98R70QXzqlTY6fR9IbC3yFIZT0ssH1X5MuAtrjQsb/Zibh0Ab7qkgQXSREXA1IXxYYqvXaHPtS4Bfkn689xa5yjEJV1HqEFaXjO3zpGJpwcnoAhpTyhPe5dJQ+GileWLk0qdUTMNRdP70g/HK8TcOkBGy9auo/TnWVrnyGhuHQA7oRsQk3UCepwJ3qbl2eEL+ekqesvcOgCwi/QQ5mFZcGcdAHDI49hvyeEWu0tFkU48hL4pTTCfG8fI5SHG2OR7Ii2H9/K8xHYsdTjnIBdMVQScT/R1a/Io6aK1Wa0nG11Fnk4dfcncOgCwh6Xav25PWO4A5OOsYPHkc6uFiynFGL9wgMpOPD2kL60DTMzTBImn923NuHc5N3oRMIQwl89NoZ+bt77UIc1+z61zFOA0ve+B4qUCvoebf2cdAHDE00OulJYBW4dA0+bWATJ5aL0onPbE9LKN0tw6AHZyGkJYWoeAnSk6AecTfM3afIox3liHyCH9OTkohPc96nKl9rsB6QQE8plbB8hs0epKD9hLnbXvjWPksrQOkMnSOkAmLAmux4ITnf0atQjodDnIcw/y80H/ZCFfp19tc85ND7Vw0g3YWQcAPHC4AuS29c4lmPOypLL5LsAnqRvQy96AXt6/tTtR+88CeMHYnYDeloNs4+6UOGenjr6G9z9q0no34CkznEAW3h745tYB0Dwv19TSOkBmXgouc+sA2Nkle2j7NHYRcD7y16vNpzTT4076c3tfFuxl0IYGpOJ969sWMLABJpQ64D8Yx8jpU+v7PcNWmrzysKrqUe2PQb6Tuh49rJxiSXBdvBSnsWG0IqDD5SDPPcrfjNZzC7XdWfSWU45cR2Vav/F31gGAxnm65zHOQw5erqmVt5VTyco6QCZe3sctOOf51Z8xOwG9v3ncbxKd/vxL6xzGvF8HqEg64bvlWWk6AYFpedoG48r7OA9ZeBlHtj4J+ZKVdYBMOusA2IvX69GtUYqAqXXd03KQ5+69bGz7lhjjldouKrzlkn3IUJmWb/wUAYGJpH2ETq1zZPKgtj8rUY7OOkAGt16X1ac/92frHBl4rgvU6DSEsLQOgXzG6gScj/R1auVpJnwXc+sAxrzM4qINLe/J46VAAViYWwfIaEkXIKYWQujkY2ullXUAYyvrADmwxLQ6C/Zy9IMi4PFuvR4G8pL0etxa5zA0tw4A7CrNSjfbvZseqgCMz8sD3iOrPZCJh2vK3YEgz8UYb+RjD/XOOgD2ciK29XLj6CJgqhi/PzpJvZbWAQq1tA5g6JyZFFSm5QH5zDoA0BpnS4FZBoxcOusAGdzQVSup7XHXEw9F7dZcMnnuwxidgJ4vcLoAX0A3oOvrAvXprQNMaGYdAGjQ3DpAJo+iCIgM0n7SHpoqPBS/duHhdTilKaJKS+sAmN4YRcD5CF+jVkvrAIVbWgcwNLcOAOyhtw4wIQ4HAcbnZaJrRdcSMumsA2TwmJbCuseSYBTsPIQwtw6BaR1VBHS+FJguwDc47wZ8z+wXapEecu+tc0yE07qBEbEUGJiEh8I6BcDveXg9OusAOMgydSejUcd2Anq4Yb2EgeFuVtYBDHm+PlCf3jrARM6tAwCNmVsHyORzOjgJyKGzDpCBh6LXPjy8HjwL1elU0sI6BKZzbBFwPkaICj3Qzr6bdKJesyePvmFuHQDYw511AABV6KwDZLKyDgAf0soRD921vXWAkjhZEnySusdRnwWr2tp1cBHQ+VJgugD3s7IOYOQ9rdSoSLNFQE46A8bhaOzHZC9y6qwDZHDL/ppb9dYBMqAIWKcT+d7fv2nHdAJ6be99lN+i1qE8F029XieoTIyx2SIggNF4uadRAEROHookXFPbeXhdOusAONglE+ltOqYI2I0VojI3zGTtJ71e19Y5jHh5YEIbWj0cxMMDFpBDZx0gE8+Tl8ivsw6QQW8doFC9dYAMOusAOMrSOgDGd1ARMC1x/DByllowMDzMyjqAEa/XCeq0tg4wEZblA+PwcE+750AQ5JKeqVpfYv/IaoPt0mdN63unn7K3XNXOQwhz6xAY16GdgN2YISrywE3sMDHGXu3f5LYKIdANiFq0+vlGERA4kqMlQSvrAHDFQ6e6hyWvx+itA2Tg4X3esiX73Lfl0CKg16IGXYDHWVkHMOL1ekF9Wt3qgMEncDwv9zIKFsipsw6QQW8doHC9dYAMOusAOMqppIV1CIyHIuB+GBgeZ2UdwEhnHQDYUaudgACO11kHyIClwMitsw6QQW8doHC9dYAMmIyt30eWdbdj7yJgCOFMw5HR3twyMDxOev1aPXjgNafpugFggyUMwBGc7Fsm+Z2shJ3Wx4ePPD+9zsm+gOfWATAKVkU24pBOQK9dgCvrAI1YWQcw0lkHAN6S9u5skYfiBTClzjpAJqz4QDapq6b1xoreOkAleusAU6MhogkfHO0P3LRDioDd2CEqwcBwHF5fx846AAAAB+qsA2TAUmDk5qEowjYju/HwOnl4v3tAN2AD9ioCpuUgHtt5P8cYW90wPyvHS4I/WAcAdvRoHQBAcTrrABn01gHgjoeiSG8doBK9dYAMPLzfPXgfQphbh8Bx9u0E7KYIUYHeOkBjVtYBLNA+jUp4mI0GsCNH+wF6XakAO511gKk1vM3IqGKMHsZeFAHbcZXGBqgURcDdMDAcl9fXs7MOAHhFER44WGcdIINHihUw0HpRxOPKn2PcWgeYmMfVhK06kbSwDoHDUQR8G3vEjMzJKVjbdNYBAADYU+uFCokVH8gsddG0fiiIh+62MTX/eqXDcNCGj/w867VzEdDRcpDneusAjfLYDcgMGACgNp11gAx66wBwx0Nxvfmi1sg8vF4e3veecEhIpfbpBOymClG4lXWARnksArIkETVYWwcAUBQPE1i9dQC401kHyMBDUWtMa+sAGVAEbMsHnm3rRBHwdY9ONmrNzvHeO511AOANa+sAAMoQQvDwwMZYDxZm1gEy4Lrag5NnIw/3FG/oBqwQRcDX9dYBGvfZOoCBzjoAAAA76qwDZNBbB4BLM+sAE3uIMX6xDlGh1g9TmVkHwOjehxDm1iGwn32KgB73A3S5ZDWj3jqAAQ/LqgAAbfDQtdFbB4BLrY8H19YBKrW2DjAxj/UED67S+RGoxE5FQMdrvXvrAI3rrQNYcHw9AQDq4qEIyJJFZOXkYbm3DlCp5j+PnGwz4c2JpIV1COxu107AbsoQhXqIMa6tQ7Qs7cHzaJ3DADc/AEANmu/acLIPF8riYRy4tg5QqeaLgJI8FME9+hhCmFmHwG4oAr6stw7gRG8dwEBnHQAAgNc46Vpvff8tlIkiIF7iYR/FzjoAJrOyDoDd7FoE9HCzeq63DuBEbx3AgMfrCQBQl5l1gAx66wBwyUMnlIeOttE56UyeWQfAZM6dTCBW780iYFq3f5IhS2m4eeXRWwcwcEq7NACgcB4mrBjrwUJnHWBqnAx8lAfrABObWQfApFbWAfC2XToBPQwCn3tM+9VhYo5fZ4/XFergoUMBwNs83Ke8jkFgq/X77K11gMqtrQNMbGYdAJM6DSFwSEjhKAJu11sHcMbjYMHjdYU68N4EIDn4LHA8EQlbrR+4QxfgcVr/XDq1DoDJLZ2cgl4tioDbtf7hW5reOoCBzjoAAADbpMF761vBcCgIsnOyHQzPUcdpvoiathtDu04kLa1D4GW7FAHPJ09Rnt46gDMeBwvc/AAApfJwj/I49oC9mXWADJovYk3Mw2cTXWLt+9XJpEeVXi0COq7Se/jwLUlvHcDAiePrCwBQNg/3p7V1ALg0sw6QAc9Rx/FQRPVwjwGHhBTrrU5AjxfoPSda5ZVe79ZPwtpmZh0A2GJmHQCAuZl1gAx66wBwaWYdIAOeo47joYhKJ6AP5yGEzjoEfkQR8EcePnhL5PF193h9oXytbti8tg4AVMTD/WltHQAuNV/84MCd4x4QZrMAACAASURBVDhpRvFwj8FgZR0AP6II+CNuXDY8vu6ddQDAixjj2joDUJHmx398JsBI69fWo3WARrS+Qqr5Yji+Og0hLKxD4HtvFQE9HgrisRhVgt46gIHWB4KoDPtUAkhaPxn41joA0Cieo8axtg4wsZl1AGS1DCFQ+C3Ii0VAx6e5cPOy4fF1P+EDEYXh/Qg452T/Hg/L7VAmjw0W2F/rn1Gtbj2D7U4kLa1D4JvXOgE9doQ8ONmHoTjpdfe4hMDjdYZyzawDTISuHwCbPE48AjlwbY2j+deRRgh3fnXcZFYcioDfW1sHcK75G94WnXUAYMPMOgAAc511gAzW1gHgj5MtN2imwK48XA/43so6AAY/vfLfPF6YvXUA53r5WyYxsw4AbGj1c5+HkrLMnSw5fW5RyamZHroz1tYBnoQQLiT92zpHA25jjJ11iDd4uLa4346jhnsFsK/zEMJFjPHGOoh3rxUBZ7lCFIQPXFtr6wAGZtYBgA2tPqDw2V6WU/ncD6iW66vVyYBNa+sAGzrrAMimls+AY3C/HYeHYuqZaMDx6EoSRUBjry0Hfp8tRTnW1gGcW1sHMOCt8xFl4/0IoPlCRYxxbZ1hQ2cdANl4KLADu2r+XoOtTkMIS+sQ3m0tAjrZs+IHlSzTaVaMsbfOYIFNUlGCxt+HvXUAoCKtTwI/WAd4kj53W3+94YuHDrbJeX0mghsLDoax9VIn4CxniEIUMyh0zuMJwTPrAIDoUADgw9o6wIbOOgCyav6hl4YK7KGzDgAzJxqWBcPIS0VAjw+Da+sAkORzL5HOOgCghj/3mVEHduPkwJa1dYANnXUAZNXsfRYA9nTpdfVpCegE/Ka3DgBJPouAzc8MowqddYCJeOwuBvCytXWADRfWAQAU6946ADAxugGNUAT8hj0syuDx58AsCErQ6qEgHicWgENxP8okdUCcWOcARnRrHaAxrT8Tcb/BeQiByTADLAf+hgfFMvTWAQzMrAPAt8aXAK6tAwAV8dCZ3lsHSDrrAMiu1ck24BBMgkCiG9DES0VAjxfl2joAJLU/67XNqXUAuNdZB5jQ2joAAGxB9wOA13h8JoI/pyGEpXUIb34oAjbeEfKiGOPaOgP8nirGxqgw1vLDaG8dAKhIZx0gg7V1gISuMLSGotW4mn8mCiF46D7H2xaFvhfW1gGmsq0TsMQfwNTYeLUsD9YBDHi87lCAEMJM0nvjGFNqfhANYHclTPqyB5I/6V7bOu632BdNEJCGVaglLgteWweYyrYioMeLkZmrsqytAxjorAPArZYfRh9ijHy+A7tjQiqPzjoAsptZBwCAgl2yMi6fbUXAWe4QBWDmqixr6wAGePCClbl1gAnx2Q7sp+WuYKmclQYtT74AAHCIErsBm0QRcECnSFnW1gEMMPOB7FgKDMCZtXWA9LnLgWAA3sIYBt6chxDm1iE8oAg44EO2LGvrAAboBISFhXWAifXWAQDgmc46ADARnqfG5aFJpbMOgOIsCz0kpCnbioAeZyc9fMjWZG0dwEDL3Vgo19w6wJRijL11BqAWIYTOOkMGJYz3WArsU2cdIIMSri8AdTtV+00K5r4rAjo5uWobZq7KsrYOYIFZD+SU2u1PrHNMiFPfATxXwnivsw4AAEDBFo7rUlk87wScWYSwxumRZYkxrq0zGGFfQOS0tA4wsd46AABsSicftjz5AgDAsU7U/nOKKYqA5ZwUh+89WgcAWpW6AFvf+qG3DgBUhm706bEUGACAt1062abEBEVAp0tPK1DCkp3cOusAcGNpHWBqMcYb6wxAZTx0o1uv/OiMvz+ASjjZ19jDfQeHW1oHaNXzIqDHWWDrASEAZBNCWKr9LsDP1gEAFMlsgjHt+3tu9f1hzsMz1to6AKrj4brA4c7T6iUTLRfinxcBPVbjPXac1cDjz8Xj9YeM0ia7Hk7c6q0DAMAznXUAmGp+jOd4T28A01lyeOb4nhcBgVJ47NDkAw5TW8nHpvQsBQZQms46AAAAlTmVjwaGrOgE9NlxVgOPRcCZdQC0K4SwkI+laPd0IwAHmVkHaByHggAAsL9FWs2EkTwvAnroEHnOY7GpBh6Ls63v0wYjIYQzSb9b58iktw4AVGpmHaBV6eGFezwAAPs7EYeEjOprEZC11gDQnvTZ3lvnyGhlHQBAmQw3+e6Mvi8AAC24DCF01iFasdkJ6HEpcNOnvlRubR3AAh9uGNNGAdBLl/dDjNFjFzGAsrEUGACA4yytA7SCg0FQJPb0Ao6zUQB8bxwlpyvrAACwRWcdAACAyp2HEOaZv+dD5u+XhftOQKAwLMvH0ZwWACVOBQZQmLQnq5dubADYB8892NdV5m3s1hm/VzabRUCPF+GtdQC8qsnK+xsoxuMo6YHzTv4KgJ/pIAZQIJYCAzjUvXWAiXkbq+J4J5IW1iFqx3JglGxtHQCoSWqR7+XzFEq6AAGUqLMOAKBaX6wDAAX6GEKYWYeoGcuBgbLMrAOgPiGEdyGEG0l/yOeys8cY48o6BFC5mXWA1qQlS+fWOQAAaAz7gB/B+3JgTpEsm8fZr5l1ANQlhLDQ0DX7wTiKJQYCwPE8dhBPrbMOAABAgz6EEDrrELXyvhzYY5GpJhRpgReEEOYhhLWk3+Wz+2/TyjoAgOI9GnxP9gMEAGAaOZoAmqwXsRwYKIvHjlzsKIQwCyEsU/HvD9G5I0nXHAgCYAcWE4udwfcEAMCD92k/9Ck12ZT008bfe+wkabKyi6pxSha+kza+vZA0F++PbZbWAQDgufTZzUQNAADTuQoh3MQYqevs4ae3/5emNVnZbcjaOgCQU9pE/mzjVyceIl9zSxcggEKxFBgAgGmdSFqIpoC9/CR9ffAESrO2DgAk84k2n336mu9El98hltYBAOAFnXUAAAAc+BhCWNEYsLunTkD2AwQKEUI4izHSpVqWS+sA+MFtjLG3DgEAL+isAwAA4MSV6MDfGacDA+WhMxd429I6AABskzrHPe61DQCAhQ8TrdrqJ/ia5lwXAem2Kt7aOgCAIl3TBQigYJ11AAAAnLmyDlCLpyLgzDIEsA3r+gG8YGkdAABewZIkAGM4tw4wsQfrAGjK+xDCwjpEDSgCAuVhj07gZZ+YIABQqnTYHgc9AcDb1tYB0Jwlh96+zfVyYKBQfHAB2z2KLkAAZeusAwAA4NSJeFZ4k+ci4KN1AADAXhYxRg50AlAylgIDAGDn1xDCbIwv1Ooe5J6LgBwKUgf2igAgSbcxxpV1CKBht9YBGtFZBwAAwLmVdYCS/ZT+2lmGAF6xlnRqHSIzlgMD33uUNLcOgdFcy+fgjMlHW7NM32ee6fuM4UrsXwgAaM95CKFrtZPvWD+9/b8AyIyDQYDvXXEYSFPWDMpgIMuEYk3v7RAC2ysAAFq1EgfgbuV5OTAAoHy3McaldQgAAAAA1TgNISxG+DrNbU9GERAAUCqWAQMAWrC2DgAADi1DCMdutbUeI0hJPBcB19YBAACvWrAMGADQgLV1gKmFEDrrDAB20lxn2ytOJC2tQ5TmqQg4swxhZG0dADthvxrAp2tOAwYAAB6FEDzsEd5bB3BqaR0gs19DCDPrECV5KgJ6O30V9fB4muLMOgBg7F7SGHt4AAAA1OjYJYzAS9aSbq1DZLY64vc215TkeTkwUCqK8vDsUdJFjLG5Gy5QOI+TbgAAeORtsv38iC0LmhsfUQQEAJTkgn0AARMU3gEAaN+7GOOdpGvrIJmtrAOUgiIgAKAUv8QYe+sQANrkZI8tlKm5ThIA1Xq6Fy40rMDx4jSE4K0DciuKgACAEnAQCICpsccWrHjotO2sA6A6FMcNpa13rqxzZLYMIbgfC1AEBABYu44xzq1DAAAAFKKzDpCBh+J4ib4WwWKMS0kPdlGyO9H+hc9+ghymKAICACxRAATK0FsHAAAAk3u+NYa3JbKX3rcH+ZvjF4D2YwCwdS9/Aw8AgD90PAEoUozxRtKtdY7MvC2D/s7f5Hd/FG7GKBZ7FcCBe0ld2o8EAHLwOvENY+kkztbNrAOgOmvrAPjK26T8eQjhYsf/t7lnFZYDo3QeBk3b8KCCln0WBUAA+THBBkxnZh2gMTPrAFOLMa6tMzj1w3Nmmqi4NshiaaduwBYncSgConQUCYC2XMcYLygAAmWJMfbWGQAAX82sA6BZJy/8+4Wkx5xBjJ2GEJbWISxQBAQA5MIhIAAArzydwAmgMmmC3tteeQuP23BRBAQA5PALBUAAxthqA5bW1gEmxvWFfXg7iKIoIYTZtn8fY1zK14TFiXYrfDb1mlAEBABM6VHSzzHGlXUQAG+6tw4wMXez/UBGLy0xxGHOrQOgabNX/pu3Q0IuQwhvTWKscwTJhSIgAGAq95LO2GsMqAZ7dQLTWVsHAIC3xBhv5K9T09UyaIqAAIApXGs4AXhtHQQAkpl1ALi2tg4wtZeWGAJbNHfiamO8dQOehxAurEPkQhEQADCmR0n/jDHOOQEYqE7rD2Wn1gGAxs2sA7Rgh6WJLWCMaKt77T/GGO80TOh78lo3YJ8rRA4UAQEAY7mXNEvLCADUh4cyYDpr6wCoBvuXogQLDZP7XpyGEJbWIXKgCAgAGMs7uv+AqjV//TrpsEGZ1tYBMphZB0A1eusAeF0a07vaK0/SwsO2BhQBAQBjOQ0hdNYhABys9eXAEh02wJRm1gEa0VkHQPN2uhfGGJeSHqaNUpQTScst/76p8RFFQADAmObWAQDgFRQBYSLG2FtnAAqytg7g3D5d8d4OCbnc0tTQ1EoJioAAgDFdhhB4yAbq1NRM9wtYDgxMp7MO0IiZdYCpxRjX1hmwm7TX9611jsyW1gGmRBEQADC2uXUAAPtjT09gcp6W1eFwM+sAE/N02EQrvHUDnocQ5hv/vDbKMQmKgACAsXkbKAAtubcOMDE6AWFpbR1gYjPrAKiCh67z0s32+Z9jjHeSrqeJUqzl0+qm1jpXKQICAMbGASFAvVrvBmS7AlhaWweY2Kl1gEacWwdA8w65Vhfy1cV5qkYbGygCAgCmMLcOAOAga+sAE6MTEJbW1gGmFkKYWWdA8XrrANhf2jLkyjpHZouNz7RmCqAUAQEAU+CAEKBOa+sAEzuxDgDXWu+0lVgSfBRWUqBkMcalfO1teqJvh4Q0s4ydIiAAYCpz6wAA9tbMIPclIQS6AWGl+etLLLnH23rrAJCOmKxvconsKy5bK85TBAQATMXbIAFogYdOJYoUsOLh+qLIfpzOOgDcOOhajTHeSLodOUvplmro85siIABgKhwQAtTHQ6dSZx0APqUTNls3sw6AssUYe+sMOJq3if5zNTTBQREQADCluXUAALtLG3+3jk5AWGp9P62ZdYDKddYBgLekCY1r6xyZNXP6OUVAAMCUOCAEqE/ry3yamc1HldbWASbG9XWc1sdMrd9fPFmooRNzPfnJOgAAVOBe0+4D8U7S+wm/vrW5pCvrEAB2ttaw9KVVFClg6U5tX1+cwH2clseDUkP7qjWg0xGHtMQYv4QQriR9HCsQ8qAIiNJ5HaivrQPgO4up9y8JIXxRuwPnhSgCAjVZWweY2EkI4Z2Tpc8oT/PvuxBCx75v+wshzKwzZOBhX0w3YozLEMJcDS2V9YDlwChd6y3xW8UY19YZkN3KOsCEOCAEqIuHhzSvk4yw11sHyMDl+H0EM+sAGXi4v3jj7ZCQ6v1Nfi9EBn8ASrKyDjCxuXUAADtbWwfIgHEgrDTfCSiur0N11gEy8PD+dyXGeCP2eqzK3xwvhWCGCkAx0ilb99Y5JsQBIUAl0udR62bWAeCTk+uLIuBhZtYBpsYy8aKMOS6nG7AiLAcGgHKsrANMbG4dAMDOWp/Vp0gBSy1P+kkOilkTmVkHmNiDdQB8Z7T7YJrcuB7r62FaFAEBoBw31gEmxiwhUI+1dYCJtXw6K8q3tg4wsdZPuJ1K659La+sAmNRC0qN1CLyNIiAAFCIdCPPZOseEOCAEqMfaOsDUQgh0A8JK80uCud/vx8nJwL11AEwnbTN3ZZ0Db6MICABlab0bcG4dAMBOeusAGVAEhJXmi4Bqf2nr2Dx8Hq2tA2BaMcalWPZdPIqAAFCQGONKbbfSc0AIUAcPRQoPD90oE9cXnvPwenl439dkNtHXZfufwlEEROk8Fgta34wdb6MbEICptKyn9dn8zjoAfErbf7TOQ1FrTJ11gKk5ORm7JqdTfNEY4414ni3aUxHQ4w/JY3GpRgwg4FHr+2kwQwjUofUHNg4vgKXWn79aP+RibK0/87R+Ija+x1i/YJ47AVv/oAVQqTRT2nIHDgeEAHVovQjI4QWw5OH64nlrB+lQkBPjGFNr/v2Ob9KzzLV1DmznuQgIACVrvRtwbh0AwJt66wAZdNYB4JaHoghFwN14eJ08vN/xvYXa3ue8WhQBAaBMre8LyAEhQOFijL11hgw66wBwy0NRpLMOUInOOkAGHt7v2JD2Fm69qaFKFAGB8nyxDgB7adPwz9Y5Jja3DgDgTa3v48S+ZTDh5JCEzjpAJTrrAFNzMqlUnamX7McYl2p7i6MqPRUB15YhAHzHw6AQu2m9G5BNg4Hy9dYBphZCuLDOALdaPxzklK7/nbR+SFHrk0k1y3F9Mt4vjOciIDekOjBDD89u1PZeGhwQApTPw8RUZx0AbnF9OedkHOThfY4XxBhv1P6ER1U8LwdufcYFQOXSXhqtdwPOrQMAeFVvHSADOgFhpbcOkEFnHaBwnXWADHrrADBHN2BBPBcBAaAGK+sAE+OAEKBgaX/S1vfzOQ0hzKxDwCUPHVKddYDCeZiE8PA+xyvSHqjX1jkwoAgIlIcbJb5KGym3/gA+tw4A4FW9dYAMPDyIozBOiuzvKbJvlyZBW1+d9ujkEBy8baG2tzmqxlMRsLcMAeA7nA6M51bWASbGEgGgbL11gAwoAsJKbx0gg846QKE66wAZ9NYB8KpZrm+Utjm6yvX98DLXnYDMSpXNyUa5wC5W1gEmxgEhQNl66wAZnLM1AYx46JLqrAMUysPkg4f3d81mOb9ZjHGp9rufi+e6CKjMb3oAOERaLtT6qVpz6wAAtnOyZFHy8UCO8vTWATLg2tqusw6QQW8dAMVhBZCxpyIgyw+BcjBjhm1W1gEmxgEhQNl66wAZzK0DwJ+0X1rr+2Sd0PH/vRDCmaRT6xxTS3tbA1/FGG/UfnND0f4mfb35AChA2i8BeO5G7T8kzK0DAHjRjXWADM7ZKgZGeusAGdAN+L25dYAMKPTgJXQDGvK+HJiuk7J11gGAUqTicOsP4QwIgHL11gEymVsHgEu9dYAMKAJ+r7MOkEHr41YcKDWhXVvn8Mp7EfDMOgDwTOudXjhO64MpDggBCpUmIjx0dcytA8Cl1u/v0nCP59lLXw+nfG8cI4feOgCKthDPviY2i4D3ZikAPGFpPl6U9tBofXP+uXUAAC/yUqjorEPAF0eH78ytAxRibh0gg0e2HMNr0uTilXUOjzaLgOxDhtKwXBv4UesP4RwQApSrtw6Qydw6AFzqrQNkwJLgwdw6QAatj1db0Vl+8xjjUj4mQIrCcmCUzOPPh2I83uJhxmxuHQDAj1JXh4fB+iUHhMCAh6LJaQjBdSHQy6nA8lHUxjjYEzyzzSKgx3Zduk1QGo/XIfaQlgy1vn0DgwGgXB4KFRKfQ8ivtw6QiesioPx8tvTWAVCHtN2Rhz2Hi8FyYACoT+vdgOzJBZRrZR0gkzlbEyAnR4fvuN32I/25PRRB79OkNbArL8XxInhfDjyzDoBXnVsHMEAxHrvw0Ikztw4A4EeOlgSfiIcS5Ofh/i75vcdfaPhsaZ2X9zFGksYW19Y5vPC+HNjDfgyoi8frEHtK3QKt3yjddgoAFfDygLfgcwiZubm2rAMY8fLn9vI+xrgWkh6tQ3jAcmAAqJOHAdbcOgCArVbWATKhGxBZpSWUHjpt3W37kf68761zZPCQurqAvaQmh9a3PCqC+yIgp7+VydvAYMPaOgDqkDbRbX22jIdvoECOlgRLdAMiPw+TfJK0tA6QmZcxjZf3LyYQY1zKz/jCzNcioOOK/cw6APCETXSxp5V1gIm56xQAKuLlQe9E/ooVsLWyDpDJuZd7fGo6+WAcIxcv9wZMx0vB3Iz3g0FQLmbdgbetrANkMLcOAGCrlXWAjH5l5QhycdZpO7cOkMnSOkAmjzHG3joE6pZWO3k4Kd3M8yLgvUkKW511AGx1Zh3AAB922Et6UGj9c5sDQoACOfn82bSyDgBXvHRTXYYQmh7zpwmES+MYuXh532J6dANO6HkR0OW+gABQsZV1gAzm1gEAbLWyDpDReQhhbh0CbqysA2TU+kEAS+sAGbX+s2zRzDrANmmi8do6R6ueFwHXFiGMzawDYKumZwVf4HVfThxnZR0gA2YDgTKtrANkdkVnMnJwtiS42b0B05/LSxcgpwLX6dQ6wCsWav8QRBMUASkClsrjIJtOXOwtxvhF0mfrHBPjgBCgQE4+fzadiOVuyMdTV1Wrf9aldYCM+GzEqNIYo9XPBlMsB0apZtYBDKytA6BaK+sAGcytAwDYamUdILPzEALdycjBU1HlfWvXVdo+4Nw6R0Yr6wBoT4xxKT9d0dk8LwJ6bOH19OFck5Jbk6eytg6AOqVTtFpvl+eAEKBA6fPH2wD999YPM4C9GONavg6NW7ZyCncar3jqYLpnKTAm1NQEQQmeFwEBc44f9OnExTFW1gEymFsHALDVyjqAgd7xeAX5rKwDZHSidgpnKw1/Hi9W1gHQrjTZ6GlCZHLfFQFjjL1RDlPM5hbH5c+DGTQcaWUdIANmAoEytfLgvo8TUQjE9Dx0+m/6UPuy4BDChaQP1jkyW1kHQPOq/lwoDZ2AAwZwsOZpgIcJODlJkANCgAKlzbuvrXMYeC8efjGhdG152htQGpYFV9kQkJYzr2xTZHed3qfAZNJzjsdxxiS2FQE9tlpWeaNpWGcdwABdgBiDh26cuXUAAFt5+PzZ5kMIYWUdAk3zdm2dSFrV1mWb8t7I1zJgyV/RE3YWonFmFHQCDqq6yaBJzKBhDB66BTggBChQmqX3OJEsDZ9LK+sQaFO6tu6tc2RWY5ftlYbcnjx43U4M+aWOU2+TIpPYVgTsc4coAJ2AZemsAxigExBHSycJfrbOkcHcOgCArZbWAQxdhhBumKTARDw++FbTZRtCWEq6tM5hYGkdAL7EGJdqf/ujyW0rAnrsSGLABmtr6wBohoduQDYHBgqUOkI8D84/iMNCMIEY40o+l8Fdln5QSAhhLumjdQ4Dj/Ix5kR5iv5MqMG2IqDHjiQ6Actybh3AwNo6ANrg5EGBA0KAci2tAxh7L2nNZxQm4LEbUJJ+L7UQmAqAf1jnMLLiQBBYiDHeyO/2I6PYVgRc5w5RAG8buBbL8ey5x+I7puNhZnZuHQDAj9JEhOduQGkYV/6ZlggCY/FaBJSGQuDKOsSmEMKV/BYAJd/vR9grcmKgFj8UAdOeUu4wY1sMl12ZzKRhZB4GZpchhJl1CABbLa0DFOJjCOGOMSbGkMaK19Y5DBWx72YI4V0qSP5qmcPYtdeaAcqQDkzy/Hl4lJdOB/Z2ApXEvoClmFkHMEA7M0aVboweOnHm1gEA/IhuwO+819AVuGLiAiNYWgcw9kHSXQjBpGkgfd9ePg8B2bSyDgBo6AZsfQukSbxUBPTYleSyA61AM+sABjxeb5ieh27AuXUAAC9aWgcozKWG4sWyhGJg6qZiArwyqfvKe/fLqaS/0rWU5T2cuv+Wkv7SUNj37DYdAgWYSt3RHp53RvfTC/++l7/DGWbWASDJZzGW/QAxhRtJv1uHmNhpCOEibRCMesxYHnm0L6njt1gxxlV6aD61zlKQEw2niH4MIVxr2Fi/zxkgFSAXGiZR2BO7TivRiSYN19I8hLBM3ceTSId/LMVn2ZOldQDgSYxxma5Rrs89vFQEXOcMUYiZdQBI8vlzKPpBDnWKMa5DCLdqf0JnLh8HobTkUjzAHuuT6tgUey7pT+sQhbrUsMfZg4bPsNVUhd1U+LvQ8PPw3sVUvRhj7+T+votTSX+kCYcrjXRibeownGv4nKW48A1dgCjRQtK/rUPU5KXlwOucIQrBjbQMHgenLAfGVFbWATL4UMLSOiCzKgrf6WGRfW9fd6rhgIG/Qghf0sEHi2O6ZdPSxS6EcBVCuJP0Hw2d4R7HWK1aWgcozKmG9/j/pWtovu/YIIQwS7/vRtL/pa9HAfB7S+sAwHNpRRBjjT2EGOOP/3KY/fi//HHM/Z2TjuykzXb/ss6RW4wxWGcYQ3pgabXj4+caZz7TZ/la7S/5+i3GuLQOMbYQwo83aEB6jDFWs5eb13v7iB71bcVA/8r/N0u/ztT+Z/42tzHGzjpETiGEXjQxvOXp+llre5PLTL6vm324u8Y2pW7Tj9Y5ptDCsyhjjf1sXQ4cY/wSQniUvw/DmXx2QZZiZh3AAKcnYjLps/xG7S+9nIvZafjRWwfYR4zxLu1/1/rn0FRO9K3QQ8EHm+Yaujzxsqfrh2vneEvrAMBLGGvs56XlwJLPfco66wDOeTwUZG0dAM1bWQfI4DSEcGEdAsiktw5wgIWGjhwAI+GkYGT0ucYVMXCHscaOKAJ+b2YdwDmPRcDeOgDalgZtHjpO59YBgEyq2A9wU9qof2mdA2jQ0joAXKjhICo4l8YaV9Y5akAR8Hsz6wDOzawDGPB4nSG/lXWADDggBB481Lp3cYzxStK9dQ6gJenz4DfrHGjada33HfiT9gj30PxwlNeKgOtcIQrCfhG2PJ5at7YOABdW1gEymVsHACbWWwc4Et0kwPiuxBI4TONRfG6jPrxn3/BiEdDruv90sgwySyfLuhNjpBMQk0szuLfWOTKYWwcAJlbdUuBNaWz5yToH0JK0BI6HXkxhmd5fQDVijDfy8dxzsNc6ASWfyzYohV0IIAAAIABJREFUAtqYWQcw4PH6gp2VdYAMOCAEreutA4xgKZbqAKOKMa7EQy/GdZ+2cQBqxMTIK94qAq5zhCjMzDqAUx6Lr3QBIqeqO4j2MLcOAEzkvoWOjPRnmFvnABrEQy/GxPsJ1Uqr7Tg9/QVvFQE9Fik66wBOUQQEJpQevD3cDDkgBK1qppDPsmBgfOmhl+sKY7j2ujUYmrIQ+6Vu9VYRsM8RojAcDmLD4+tOERC5NVNEeMPcOgAwgd46wMiWYlkwMLaluK5wHA4DQRNSAwRL2regE3ALDgfJy+vrzQwbcksb5Xp4OJhbBwBG9tjaPSMNztnDExgRy+0xgnkLW08AkhRjXMrHs89eXi0Cpg8Ajy+ay6KUoc46gAEOBYEVD92AHBCC1vTWAaaQli/+yzoH0BKW2+MIn9OEMdASOlufeasTUPLZDdhZB3DGY9HV43WFMnhpi59bBwBG1FsHmEo6ffKzdQ6gMUv5bOTA4R7F2AkNSoVtTk/fQBFwO49FKUuddQADHq8rFCDGuJaPTlQOCEFLWu/MmIuCBTAalgXjACwDRsvoBtywSxGwnzpEgd6HEN5Zh/Agvc6n1jkMUASEJboBgXo8pOJ9s9gfEBhfWhb8m3UOVOETy4DRsrT9yLV1jlK8WQRsbSPqPXTWAZzorANYcHxdoQxeBnpz6wDACHrrADmkAfov1jmAlqRN8T10/+Nw9xqWjwOtW2hY9u7eLp2Aks+bB0uC8+isAxhgTwKYSl03Hvbg4oAQtMBL0V4xxpU40AAY24V48MV2j2IZMJxI73Mvq6FetWsRsJ8yRKE66wBOdNYBDLAUGCVYWQfIZG4dADhSbx0gpxjjQj4mKYAs0nYCc+MYKNMidWEDLqTuaPd7EO9aBPT44XBuHaB1aT/A99Y5DPTWAYC094uHzgAOCEHN7p12aMzlcxUKMIl0z2d/QGz6lLqvAW/cHxJCJ+ArWEY2uc46gBGPRXWUaWUdIJO5dQDgQG6WAm9Khc9OzNYDo0kdMHTZQpJuU9c14E6aFHG9PddORcDURu5xINZZB2hcZx3AQPOnPKIqK+sAmcytAwAHclkElL47MdhDxzKQy1x02Xp3L05jB1wXwXftBJR8di911gEa5/EG1FsHAJ6kfWA8PAxwQAhq9Oh9r6b05+9EIRAYxUaXLdeUTxwEAujr+OLaOoeVfYqA/VQhCvaevaSmkV7XU+MYFnrrAMAzK+sAmcytAwB76q0DlIBCIDAuCoFuPUrqvE8uARsWcvo5SBHwbZ11gEZ57crprQMAz6ysA2TCASGojdulwM9RCATGtXFNwQ9OAgY2pAmRK+scFnYuAqYPDY+DL6/Fqql11gEMsB8gipNugF42Cp9bBwD20FsHKAmFQGBc6Zr6xToHsviFk4CBH6UDk9ydfbFPJ6Dkc0DaWQdoTQjhnaQP1jkM9NYBgBesrANkMrcOAOyISaMtKAQC40qFIQqBbaMACLzO3SEhFAHfdsKG8qPrrAMY6a0DANvEGG/k46GaA0JQC5YCv4BCIDAuCoFNowAIvCE9B91a58hp3yKg10EpD43j8vp69tYBgFd4+XyfWwcAdtBbByhZKgTO5ON0c2ByFAKbRAEQ2J2rbsC9ioBpaYq7NdPyW7SaisfX856lXSicl41xOSAENeitA5Ru44RTV7P32OpeTPAcjUJgUygAAntIk4vX1jly2bcTUPI5MGVJ8EjS63hincNAbx0AeE26+XmZ5JlbBwBecZsKXHhDjPFLjLGTo4E7fvBbjPGMidZxpMLRz2K5fa0eRQEQONRCTj77DikCelky9hxFwHF4fR176wDADrx0A86tAwCv6K0D1CbGOBcdTN7cS/pHOtkRI4ox9mLfzRo9SuooAAKHSROwLp6F6ATcndfi1dhcvo5pw1GgdF7epxwQgpJ5uQ5HlR58/yEKFx48df/dWQdpVXptz8S+m7W411AA5JoAjpAmlppfGbV3ETBVSD3uv8KS4COFEObyuRT4s3UAYBdpOZWX9+vcOgCwxSMPcYfbODDE4zjVg1tJf6f7L480JujkZ1xQq1tRAATG1PwhIYd0Akp+Z6kpAh7H6+vXWwcA9uDl850DQlCi3jpA7Tb2CfyXdRaM5kHDPmcde//lla6nC0m/WWfBVp/SdcE+ssBI0gq+picTDy0C9mOGqMhlCOGddYgapYftD8YxrHgpqqABaUmdl+V0c+sAwDPcL0YSY7zSsDyY5Yx1+03SGfuc2UrdlxwYUo5HSf+MMTbfsQQYafraOqgI6OwUyefm1gEq5bUL8J5Za1TISyFibh0AeKa3DtCSGONdjPFMdDHV6Fpp6S9dTmVIB4bM1HiHTAVuNRTGvYzVgOxSvevaOsdUDu0ElPw8JD7XdFV4Ql5ft946AHAAFydjiQNCUJYHJo2mkbqY/iGKFzW4lfRzjHHO9VAeltub+41l8UA2CzXa/XxMEbAfK0RlTkMInXWImqSH7FPrHEZW1gGAfTnr9p5bBwASr5OrWaSuwE5D8aLJQX3lnop/Xeo4Q8FYbp/dvaR/cCgOkE/qQm+yMeLgImBqQfY6iJpbB6jM3DqAkQdO6kLFVtYBMuGAEJSitw7gQSpezCR9Mo6CAcW/Sm0st6ewPp1HDd1/ZzxTAPmlwntzjRHHdAJKfmetL3lo3I3zA0F66wDAEVbWATKaWwcAxD0jm7SkcSHp75I+W+dxiuJfI1Jh/UwN759l5LOGvf+W1kEA55rb1owi4OGaezNMZGkdwJDn6wOVS/vNeNk/a24dAO7dcvhBfjHGdYzxQsOpp14+76w9HfhB8a8h6Vqai2tpDPcaCuQX7P0H2EsrYJv6XDuqCOh9SXAI4Z11iJKl1+fSOoeRR07tQgNW1gEy4YAQWON+YSjG2Kf9An8WnYFTeNBwQvP/48CPtm1cS7+owSV0E3uQ9Eta+ttbhwHwnaYawI7tBJT8DlxP1NibYQKeXx+v1wXa4mmiZ24dAK711gHwtYBxoWGZMEsbj/dZ0j9jjLMY45JuVz9ijKsY40wUA3fxVPybxRhX1mEA/CjtydnMuIAi4HEWdANul14Xz0XAlXUA4Fjpgc3LZzwHhMDKIxu+l2VjaeP/03DoAUWM3T11/f09LWf0cg/BFs+KgU0tpxvBvSj+ATVZqJHmiKOLgM6XBNMN+LKFhtfHowfa+NGQlXWAjObWAeASRZJCpQNErlIR42c11AUwsgcNpy3/Y6Prb22cCQVJxcBO0j/EdXStYc+/M4p/QD1Sc8SVdY4xhBjj8V8khJUc7/0macYSh29SF+BafouAn9Kpg66EEM7UyAfjFgvPnTohhBtJHrqe70q6dkMIvXUGZHFFt1Q90hjnIv36YBzH0oOGAvbK8/0Rh0nX0Tz9em8aJo97DZOqK54Z6xRCWEr6aJ1jCjHGYJ2hJiGEtaRT6xzHGKsIeCbpr+PjVOs3jm//xnlRWBpmwhkQAwDQsI2CYJf+2vrk562Gwl/POAdjSVtxXKi9giCF8oZQBMSTdJjgv61zHGOUIqDURkX0SH9n6cPXG/l/jGNYekjLhgAAgCNpUvypKHhum2YU9xoOrek1FP7oYMKkNgqCnerstH0qlN/wXNgWioDYlFbrVHuf/2nEr7VSoxfGjlYabljerawDGGt1OSwAAHhF6vb52vETQugknWkYH56p7MnyBw3Z7zQU/e4o+iG3VDi7Sr+erqGnX2cqr9v2Vt+K5L1tFAAZLSX9aR3iUGN2As7kuwNMkv7peV+fFlpjR0BHKAAA2GqjMPhOQ2HjnfIugXzQsG/z3cZfKfihCqnbdqZvxfVc18+9pC8aCn5rDdcMS3wdoRMQz9W8BdpoRUCp/rbIETxIOvM4kOIwEEnS5xjjhXUIAABQlzSOOkv/+FQkfNLt8aW+aKMbUUPRQpLWTFKiVakZZabhujnb+E/dHl+m3/j7Ow3XEtcNJFEExI/S586dKqx/jLkcWBqWgnouAp5qaA0t5nTJjFaq8AIY2co6AAAAqE+aQO7TP/Yv/58AnkuFunX6R7ersgDkE2NchxCuVGFx+G9jfrEY40rS45hfs0K/pqUebqRlwDVu3jumB89LwQEAAAAAcORKw2rQqoxaBExWE3zN2tykZR3NS3/OlXWOAqysAwAAAAAAgOmlLv6ldY59TVEE5HTUYVnsyjpEJjdiGbDk5+cNAAAAAIB7aTXsrXWOfYxeBEx7MlT1IkzkQ9pAtFlpDbznPSCffGbTYAAAAAAA3FlaB9jHFJ2AEt2ATz6GEObWIaaQ/ly/WucoBO93AAAAAACciTH2kq6tc+xqkiJgOiChug0SJ3IVQjh7+3+rR/rz/GGdoxAP6aIHAAAAAAD+LFXJIblTdQJKdEc9OZHUt1IITH+O3jpHQZbWAQAAAAAAgI20PVgVNbApi4ArVVIJzaCJQuBGAZCDQAaPGg5GAQAAAAAAfl2pghWxkxUB03HJq6m+foWqLgRSANzqKr3PAQAAAACAU6k2sLTO8ZYpOwGlStohM6qyEBhC6EQBcBve3wAAAAAAQDHGlaRb6xyvmbQImNZFV3NKSiYnkv6q5dTglPNPUQB87pouQAAAAAAAsGFpHeA1U3cCSoW/AIb+CCGsQgjvrINsE0J4F0JYiVOAX7K0DgAAAAAAAMoRY+xVcDPc5EVAugFfdSnpLi23LUbKc6chH350nd7XAAAAAAAAm5Yq9KDcHJ2AEl1TrzmV9GcI4cq6K3Cj++/PlAvbLa0DAAAAAACA8qSmoSLPEMhSBKQbcCe/SlqHEJa5i4Gp+LeUtBbdf2+hCxAAAAAAALzmStKDdYjncnUCSnRP7eJE0kcNxcCrEMJsym8WQpiFEK40FP8+isM/drG0DgAAAAAAAMqVDhJdWud4LlsRkG7AvZxo6Az8TwihDyEsxioIpsLfIoRwJ+k/6ftQ/NsNXYAAAAAAAOBNMcaVpFvrHJtCjDHfNxsKWf/J9g3b8yCp13Box52k9WtFqfR6zySdpV+d2OvvGH+nCAgAAAAAfqStsz5a55hCjDFYZ2hdOnj1T+scT37K+c1ijOsQwrXYd+5Qpxpeu6+vXwhcs5l8ogAIAAAAAAB2FWPsS6qD5dwT8MlChR6VDLzgUQWu5QcAAAAAAMVbqpA6WPYiYNocscijkoEXXKX3LQAAAAAAwM7SqsIi6mAWnYBSoUclA1s8xBiX1iEAAAAAAEC1iqiDmRQBSz0qGdhiYR0AAAAAAADUq5Q6mFUnYJFHJQPP3MYYb6xDAAAAAACAupVQBzMrAiZ0WaFkc+sAAAAAAACgGUvLb25aBIwx3kn6ZJkBeMFvafNOAAAAAACAo8UYe0nXVt/fuhNQGqqg5psjAhseVMjJPQAAAAAAoClLSY8W39i8CJg2R2RZMEoyT+9LAAAAAACA0aRVhyaNR+ZFQElKhy98ts4BSPqc2nMBAAAAAACmcCWDVbFFFAGTuYzaIYHkURwGAgAAAAAAJpRWHy5zf99iioDpBZhb54BrLAMGAAAAAACTizGuJN3m/J7FFAEllgXD1Of0/gMAAAAAAMhhmfObFVUETOZiWTDyehBdqAAAAAAAIKN0JsF1ru9XXBEwLce8sM4BV1gGDAAAAAAALCyVqRmuuCKg9LUS+sk6B1z4jdOAAQAAAACAhRjjWsNpwZMrsggoSTHGhaR76xxo2m2McWkdAgAAAAAAuHalYauySRVbBEwuxP6AmMajWHYOAAAAAACMpS3KllN/n6KLgKklkkINpnDBPoAAAAAAAKAEMcaVpNspv0fRRUDp6/6Av1nnQFP+xT6AAAAAAACgMMspv3jxRUBJSvu2ZTsyGU27jjFm2XATAAAAAABgV6lhabL6VxVFwISDQnCs+xjj3DoEAAAAAADAC5aa6HyMaoqAaf+2ThwUgsM8aHj/AAAAAAAAFCmdjzHJCsZqioAShUAc7FEcBAIAAAAAAOpwpaGZaVRVFQElKcZ4J04Mxn669L4BAAAAAAAoWmpiWo79dasrAkpfN0r8xToHqvALBUAAAAAAAFCTGONK0u2YX7PKIqD09cWgEIjX/JLeJwAAAAAAALVZjvnFqi0CShQC8SoKgAAAAAAAoFppJez1WF+v6iKgRCEQW1EABAAAAAAALVhqpANyqy8CShQC8R0KgAAAAAAAoAkxxrWG04KP1kQRUKIQCEkUAAEAAAAAQHuuJD0c+0WaKQJKFAKdowAIAAAAAACaE2P8ohEOCWmqCCh9VwgcZb00ivco6WcKgAAAAAAAoFWp7nF7zNdorggofX1hOlEIbN2jpC6dlgMAAAAAANCy5TG/uckioCTFGO8knUm6t86CSdxLOks/ZwAAAAAAgKalJqjrQ3//T+NFKU+McR1C6CStJH2wTYMRfZY0T2viAQAAAP333f++09AEUKv1/5z919o6ROn+++5/zyS9s85xjP85+6/eOgOAqi0lXUg62fc3hhjj6GlKFEJYSvponQNH+y3GuLQOAQAAADupENRpKPqdSXpvGmhcD5Lu0q+b/zn7L7crX/777n8vNPx8u/TXvR94C3erbz/rniJwmVquJcQYg3UGHObQ96WbIqAkhRAuNHQFtnbz8OBR0gX7/5Xrv+/+t5P0p3WOWvzP2X9lu+Hys5E0fIY8PUT1ktbS/2/vXo7bRtY2jj/8ynvpq8JedASCIxAdgZWB6AhGBwkcKAFYE8HQEYwcwUAZtCI41B4LMYI+CzRtWkcX3hp9wf9XxXLNjKfxkpRA4sHb3TIpX1hVpvPyAT7kz+YhKtO1ki48DH3TlEXtYdyd+fzd9f0++/r5xE/R/JwOqTLdVNK1+u6Hs7DVDGol6U7SbcqfW9tywd9c45zJ9aD+enXRlAWzniJBCIgYTSaTU/XXNzt9HmY9Hfg5a+3dZDIp1X+I5nS3MHf36gNAPggB7OtEvwKjn8FRZbr1hdVdUxZ3IQoDALzNhX+1pKuwlQRzov65X1Wmu5dU5zidtDLdXP37PKaA97lzSd8k1ZXpbtUHv1wDAfgf1tonF1D/tcv/l+3GIK+x1i6ttaWkm9C1YCs31toZASAAT9YXVn9XpnuqTHfrLjYBAIFVpjt1Qch/NN4A8LkLSf9Upmtz+byqTDerTGfUX8iOOQDcdKK+82xZme46dDEA4mStXahvmtra6ELANbeu3Cf1a24gPg+SPrH+H4ABnUj6Q9J/XBiY9KLjAJAyt+afUX9exv+6kGTc1NlkVaar1S97wCytl51I+uZCX76XAHhJvctfHm0IKEnWWqN+gVm6AuNyY60t3fsDACH8of7ue9IXVwCQInfubUVX2HtO1Heyz0MXso/KdAtlus6aB+vQN+XdrwF44PZN+L7t3x91CCj186g3ugJ3aqPE0d2L7j8A8VhfXN2GLgQAxsIFWn+Ljfx28VdqQaALAJnivZszSS1BIIAX1Oo3kXrX6EPANWutsdbOJH3Vli8ejmYl6atb+4/uPwCx+cNdrAAAPHLhBjde9pNMEEgAeJATSQumBgPYZK1dasvPT0LAZ9zCilMxRXgoN5Km7nUHgFhdEQQCgD8u1LgTHYCHuI29S8xN9SYAPMy5pEXoIgBE51Zb7HnxYYBCkuN2oq0nk8lCfVslH1TH911S7RJrAEjBVWW6ZVMWdehCACBDtVgD8FAn6i8CZ4HreJELeheh68jEl8p0l01Z3IUuZCSWYukwRM5a+zSZTGr1O62/ihDwDS6gmrsXshZh4DEQ/gFI2b8r07VNWbShCwGAXFSmm4pdgI/lojLdvCmLRehCXnArOj2P6VZ99yw8c7PWFoHLAN5lrV1MJpO5+s2EXsR04C1Ya5fW2rmkj9ph1xX85rukj9baOQEggMQtQhcAAJmpQxeQmTp0Ac+5oJeGiuM6S2UdSACDqt/6j4SAO3gWBt6IDUTes1L/Ov0/4R+AjJxVprsOXQQA5IBwyIszt/ZeTPjc9KMOXQCAuFhrW73RvEYIuAcXBtbW2lP1uwmzPsDv7tXv9nvqXqen0AUBwJHVoQsAgEzMQxeQqXnoAp6Zhy4gU2eV6WahiwAQnVqvNK0RAh7IWruw1s70qzvw3d1YMvWo/vl/tNbO2O0XQOZOmIIDAEcRW8daLr64jTiCc12JrAXozzx0AQDi4mZh3r703wgBj2SjO3Aq6ZOkP5V/IPio/nl+stZO3fNfBq4JAIbChSsAHMBNBT4PXUfGZqELcGahC8jcLHQBAKJ0qxcyKUJAD6y1xlp77QLBj5L+JelH2KqO5of65/PRBX/X1loTuigACCCaLgsASNQsdAGZm4UuwJmFLiBzZy5QB4Cf3LJs9fN//2H4UsZlow3zVpImk8lM/Qdh6f6MuTV+JamVZCS1boFJAMAvl2K3YADYVxm6gMzF8vrS7elfKWkZuggAcbHWLiaTyVzSxfrfEQIOzAVp7fqfJ5PJVP1Je/2YKswH5YP6Dw6zfjC1FwDeFcsFFgCkaMhz6IP677jLAY/53Kn653zx3l88kqGO86rKdEO+xyu55oUBj/ma9bXd2YDHuxvoWADSUkv6Z/0PhICBuaBtqWcnbRcObj6k/uS+OfWs1NudhI/6/YvOk/oPRrk/nyQtCfuQAHbgjtdN6AI2DH1xJRECAq+J4bz93vekfT3/fhVC6OMfy3SAY3yXVDdlsRzgWFtxS0lcu0fMs4KOYYhlM1aSrpuyWAxwrJ24nXtr+f9uMvU8PoBEWWvbyWTyXdKVRAgYrY1wEBi9pixmoWvAy5qyqEPX8Jy7uLpU/6Xb9x344F0WQIxiOG9Xpmvl53d0EeO5L1G+z9FfYwyGmrJ4klRXprtT37XmLQisTDdryqL1Nf4WZp7Hf5A0c69pdNxrP6tMt5C7APdk6nFsAOmr1V8fnbAxCAAgK01ZPLmLvlL5bMoEANjNTYwB4KamLIzYaf4QK0mXsQaAm5qymCuODmkAI7SxVwW7AwMA8uTCwEv1XQLeDLzeEQDgfSu5i53YuU4xwqH93MY0zXsL1x7HHmLaNYC03Uq6IQQEAOTOd5cFX7wBYEeeb6AsUugO27AIXUCiFqEL2IXr/PR1Y5IdmAG8yVr7ZK2tCQEBAFlzXQLfQ9cBAPiNzxsorcexfWhDF5Cgx8S6ANfa0AUAGDdCQADAGLShCwAADCalLkAlGmaFtgxdwJ6WoQsAMG6EgACAMWhDFwAAGEbg3XD39Ri6gMQkFfRuMKELADBuhIAAgOzRZQEAiNwydAGJIUwDgD0QAgIAAAAAAACZIwQEAAAAAAAAMkcICAAAAAAAAGSOEBAAAAAAAADIHCEgAAAAAAAAkDlCQAAAAAAAACBzhIAAAAAAAABA5j6ELgAAAN8q052GrgEAgDcYT+M+eRoXAJAgQkAAwBjMQhcAAMBrmrK4Dl0DACB/TAcGAIzBZegCAAAAACAkQkAAQNbcVGCfISBTrQAAAABEjxAQAJC7W0knvgZvysLXOk4AAAAAcDSEgACAbFWmW0i68niIlcexAQAAAOBo2BgEAJCdynSl+g7AC8+HogsQAAAAQBIIAQEAe6tMNwtdw4appFL9TsDnAx2TEBAAAABAEggBAUQvsqDpEKYpi9w2kfgndAGBtaELAAAAAIBtEAICSEEuQdNnERrlpg1dAAAAAABsg41BAADYz48MOzsBAAAAZIoQEACA/SxCFwAAAAAA2yIEBABgd49NWdyFLgIAAAAAtkUICADA7urQBQAAAADALggBAQDYzX1TFovQRQAAAADALggBAQDY3krSdegiAAAAAGBXhIAAAGzvuikLE7oIAAAAANgVISAAANu5YRowAAAAgFQRAgIA8L6bpizq0EUAAAAAwL4+hC4AAICIrdRPAV6ELgQAAAAADkEICADAyx4kzVkDEAAAAEAOCAEBAPjdo6Sa7j8AAAAAOSEEBADgl1VTFtPQRQAAAADAsRECAgDwy0llupIpwACAIVWmm0uaehh60ZTF0sO4AIAEEQICAPC7S0mEgACAIc0lXXgYt5W09DAuACBB/xe6AAAAInMZugAAAAAAODY6AQEAh/gc8NilpG8exj2vTDdl+hQAAACAnBACAkjBTegCjmQZuoBja8qiDXj4tjKdjxBQ6rsBbz2NDQAAAACDIwQEEL2mLOrQNSBaPyR98TDuTISAAAAAADLCmoAAgJS1nsb9Upnu1NPYAAAAADA4QkAAQMruPI498zg2AAAAAAyKEBAAkCy3ecejp+HZJRgAAABANggBAQCpaz2NSwgIAAAAIBuEgACA1PmaEnxSma70NHa0xvicAQAAgDEgBAQApK71OPbc49ixSmVDFMJKAC9KdGMnzmm7mYUuAABSRAgIAEhaUxZPku49DT/zNG7MZqELeE9luqmkk9B1AIhWioEa57RxmIUuAMC4EQICAHLQehr33AVOY5LCxfMsdAEAopbCeewnlmHYy0XoAvY0DV0AgHH7ELoAAACO4E7Svz2NfSnp1tPYMfpSmW7qdl6O1Tx0AQAOZjyOPVNa5+1Z6AJSVJnusikLX+sC++Jr07GVp3Hf5ALsvaffN2XRHq8aANsgBAQAJK8pC1OZbiU/06nGFgJK0kKRXpRWprtWuh0gAJymLJ4q0/kaPoWbGZuuQxeQqEv52xzs6CrTzeVv2rfPUP03boZErf71P+j5uHPAg6Q6wUAXSBLTgQEAufD15fEi0UXmD3FRmW4R2/N2F1DfPB+m9Tw+gGEkcfOmMl0t6Sx0HYm6qkw3C13ENtznaR26jkO5zj8j6UrHCzTPJf1dmW5xpPEAvIEQEACQi9bj2L6m7xzC99SfK0mmMt11yHURK9OdVqa7rEzXSvorVB0AkvMlxpsZm1xns6+lLNaePI//nqXn8e9iDwLdZ2irxMNe97t0J3/djFeV6WL8vgVkhenAAIBctB7HnqmfIhsTI//TYs/Ud959c1N2fO3C/Jqphr9oWg58PGDMHtR3AflyJWlWme7WG68BAAAEyklEQVRW0l0M04NdkHKpfm1T70sbNGUx2DTRVyw9j38i6Z/KdD8kLWKaUuq65ubu4Xv35yHe50v5/0yuldAUbyBFhIAAgCw0ZbGsTOfrgjLGO9NLDb82XvZr8cUQEgAjspTfEFAKfzNjUyn/YdCmxwGP9ZrlQMf5or77U+qf91DHfcmp/P9cPzdEx+cQ34XOK9OdNmURuoMVyBYhIAAgJ638fPE+qUw3i2wXu/WaPDieh9AFACNj1Ic3Q8r+ZsaGZegC3A06Xxt3veZMiU+93UM7wDGGmlpfivV5AW9YExAAkBOfU0hi6wYMPcUrR23oAoCRaUMXkLk2dAEOn1f+DfEajylAB7JFCAgAyIbnTr2oQkD3XH1vDjI2begCgJEhHPKrDV2Awxpvfj0wfRbAtggBAQC5+eFp3DO3yHdM2tAFZKYNXQAwJi648HXOHrtVREtYEAL6tQhdAIB0EAICAHLTehx75nHsfSxCF5CRH3RSAEEQEPkRzevqNlxizVV/onmvAcSPEBAAkBufX4bnHsfeWVMWd4pj98cc3IYuABipO7G0gQ+xndNiqycX9+xqD2AXhIAAgKy4L8O+grHzynRD7Y63rUXoAjLwGNG0OWBUXAcuAdFx3TdlEdt6i4S9ftShCwCQFkJAAECOWo9jR7VBiPqLZ7oBDzMPXQAwcrciIDqm69AFPOfC3jp0HZm55wYWgF0RAgIAcuRzSnBUIaC7sIrugi8hP7iIAsLiPHZUf0bYBShJasriVqwNeEz8zgDYGSEgACBHrcexZx7H3otbG/B76DoStBJdgEAUmrJYiJ2CD/Wg+Lvt5qLr8xj+FWvYCyBuhIAAgOy4rpJ7T8OfVKaLqhvQuRYdFrtYSZqxIzAQlbk4j+1rJWke+znNBVd0sB3mu+uqBICdEQICAHLVehx75nHsvbgLv5m4gN7WNV0UQFw4j+1tfVMjiXOa6/r8GrqORH1vymIe6Nh0cAIZIAQEAORqNOsCrnEBvZWVpM/uIhRAZDiP7SypAHCNIHAvIQNASUrqZwzAywgBAQBZchdEvu5an1WmKz2NfZCmLJ6asigl/Rm6lgg9SCrZCASI20YQyHnsbfeSpqkFgGsuCPwkdrh/z0r9GoDzwHUshzgIn9GAX4SAAICcja4bcK0pi2tJn0U3jdRfQN00ZVE2ZbEMXQyA97kbGuvzGCHR71aSvjZlkfy6pi7ALCXdhK4lUvfqb17FsAZgO8Ax2BwI8IwQEACQs9bj2FGHgFJ/N911BX7VOMPAlfoLy2lTFnXgWgDswZ3HphrveWzTo36d0xaBazkaF/jWkj6q7/5k7bk+DPvsgt5l6GKkn52bvn8HYwg7gax9CF0AgGz43I0Vhxnze9NqvM/9J/fFfeGmMM/VT7M7D1iSTyv1HaB3TVn47AQdwph/d4/B1xTJpadx8YYXzmOXks5C1jSQnM5pb3Jh13Vlulr9+3up/vPqJFxVg3qQtFD/Xi/DlvKqmfrvVj6+Q3xlKjDg38RaG7oGAAAwsMp0U/VTsNaPU/dnShdb64DMrB+pro0FYHeZnMc2rc9prfqwmXOapMp0M/Xv61S/3ueUb2Q9qn9/149W/XudxNTuynSn+hXEXxw43KP6519HHHwCWfkvELMrkI3QfCwAAAAASUVORK5CYII=';
+
+  /* ── Product line constants ─────────────────────────────────── */
+  const METAL_STANDARD = { ferrous: '1.0mm', nonFerrous: '1.5mm', ss: '2.0mm', intro: 'During production, inline metal detectors are challenged and calibrated hourly for adequate sensitivity to and rejection of the following test pieces:' };
+  const METAL_CANNED   = { ferrous: '2.0mm', nonFerrous: '2.5mm', ss: '3.0mm', intro: 'During production, belt metal detectors are challenged and calibrated hourly for adequate sensitivity to and rejection of the following test pieces:' };
+  const METAL_COCKTAIL = { ferrous: '1.5mm', nonFerrous: '2.0mm', ss: '2.5mm', intro: 'During production, a metal detector is continuously monitored and challenged at defined intervals for adequate sensitivity to and rejection of the following test pieces:' };
+
+  const MICRO_STANDARD = [
+    ['Aerobic Plate Count','<2,000 cfu/g','AOAC – RI PTM 051702'],
+    ['Yeast','<2,000 cfu/g','AOAC – RI PTM 051702'],
+    ['Mold','<2,000 cfu/g','AOAC – RI PTM 051702'],
+    ['Coliform','<10 cfu/g','AOAC – RI PTM 051702'],
+    ['E.coli','<10 cfu/g','AOAC – RI PTM 051702'],
+    ['Salmonella Spp.','Negative in 25g','AOAC Official Method Cert #100701'],
+  ];
+  const MICRO_COMPOTE = [
+    ['Aerobic Plate Count','<5,000 cfu/g','AOAC - RI PTM 051702'],
+    ['Yeast','<2,000 cfu/g','AOAC - RI PTM 051702'],
+    ['Mold','<2,000 cfu/g','AOAC - RI PTM 051702'],
+    ['E. coli','<10 cfu/g','AOAC - RI PTM 051702'],
+    ['Coliforms','<10 cfu/g','AOAC - RI PTM 051702'],
+    ['Salmonella Spp.','Negative in 25g','AOAC Cert # 100701'],
+  ];
+  const MICRO_ASEPTIC = [
+    ['Yeast','<10 cfu/g','FDA BAM, Ch 18'],
+    ['Mold','<10 cfu/g','FDA BAM, Ch 18'],
+    ['Coliforms','<10 cfu/g','AOAC – RI PTM 051702'],
+    ['E. coli','<10 cfu/g','AOAC – RI PTM 051702'],
+    ['Salmonella Spp.','Negative in 25g','AOAC Cert # 100701'],
+  ];
+  const MICRO_COCKTAIL = [
+    ['Standard Plate Count','<1,000 cfu/g','AOAC 990.12, 988.18'],
+    ['Yeast and Mold','<20 cfu/g','AOAC 997.02, 2014.05'],
+  ];
+
+  const BOTTLE_SHIPPING_DEFAULTS = { caseDims: '9.5”L × 6.375”W × 10.375”H', caseCube: '0.364 ft³', casesPerPallet: '140', casesPerLayer: '28', layersPerPallet: '5' };
+
+  const LOT_A_TEXT = [
+    'Identifies the date of production and final four digits indicate the time of processing in 24-hour format [military time]',
+    'YYMMDD ####     YY = Year   MM = Month   DD = Day   #### = Military time',
+    'Example: 260121 1643 = January 21, 2026 at 4:43 pm',
+    'Production lot number, time of fill, and best used by date are printed on the bottle. Product code and production lot number are printed on the case label.',
+  ];
+  const LOT_A_PAIL = [
+    'Identifies the date of production and final four digits indicate the time of processing in 24-hour format [military time]',
+    'YYMMDD ####     YY = Year   MM = Month   DD = Day   #### = Military time',
+    'Example: 260121 1643 = January 21, 2026 at 4:43 pm',
+    'Production lot number, time of fill, and best used by date are printed on the pail. Product code and production lot number are printed on the case label.',
+  ];
+  const LOT_B_TEXT = [
+    'YYMMDD identifies the date of production',
+    '(YY = Year   MM = Month   DD = Day)',
+  ];
+  const LOT_C_TEXT = [
+    'Identifies the date of production: (Y = Year) (M = Month) (D = Day). Final four digits indicate the time of processing in 24-hour format [military time]',
+    'YYMMDD####',
+    'Example: 260211 1643 = February 11, 2026 at 4:43 pm',
+  ];
+  const LOT_C_COCKTAIL = [
+    'Identifies the date of production: (Y = Year) (M = Month) (D = Day) (H = Hour) (M = Minute)',
+    'YYMMDDHHMM',
+    'Example: 2601111643 = January 11, 2026 at 4:43 pm',
+  ];
+
+  const ALLERGEN_TEXT = 'The Oregon Fruit Company does not use, nor does it allow, any of the nine major allergens (milk, eggs, peanuts, tree nuts, sesame, fish, shellfish, soy, and wheat) or common sensitizing agents (gluten, products, sulfites, mustard and mustard products, celery and celery products, azo dyes, carmine) in the products or processing areas.';
+  const NONGMO_TEXT   = 'This product does not contain any components grown or developed from a genetically modified organism and is not a Bioengineered Food, as defined under the USDA National Bioengineered Food Disclosure Standard.';
+  const SDS_TEXT      = 'This product does not fall under the guidelines established in 29 CFR 1910 (Occupational Safety and Health Standards), Subpart Z (Toxic and Hazardous Substances), and therefore does not require an SDS.';
+
+  const SPEC_TEMPLATES = {
+    'Frozen Smooth Pourable Fruit': {
+      processing: 'Product is pasteurized following FDA guidelines for Juice HACCP: 21 CFR part 120.',
+      micro: MICRO_STANDARD, metal: METAL_STANDARD,
+      packaging: 'High density polyethylene (HDPE) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.',
+      lotCode: LOT_A_TEXT,
+      storage: 'Store and ship frozen at or below 0°F (-18°C). To use, thaw refrigerated 12 – 24 hours.',
+      bestUsedBy: ['30 months when stored frozen in original unopened containers.'],
+      daysAfterOpening: 30,
+      pieceSize: 'Pourable and smooth',
+      shippingDefaults: { casePack: '6 - 32 fl oz plastic bottles', grossWt: '15.16 lb (6.88 kg)', netWt: '14.16 lb (6.42 kg)', ...BOTTLE_SHIPPING_DEFAULTS },
+      statusBase: 'Kosher (OU), Vegetarian, Vegan',
+      hasGRAS: false, lineType: 'bottle',
+    },
+    'Frozen Diced Pourable Fruit': {
+      processing: 'Prior to dicing, fruit is washed with a diluted peracetic acid solution.\nProduct is not pasteurized.',
+      micro: MICRO_STANDARD, metal: METAL_STANDARD,
+      packaging: 'High density polyethylene (HDPE) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.',
+      lotCode: LOT_A_TEXT,
+      storage: 'Store and ship frozen at or below 0°F (-18°C). To use, thaw refrigerated 12 – 24 hours.',
+      bestUsedBy: ['30 months when stored frozen in original unopened containers.'],
+      daysAfterOpening: 14,
+      pieceSize: null,
+      shippingDefaults: { casePack: '6 - 35 oz plastic bottles', grossWt: '14.25 lb (6.46 kg)', netWt: '13.13 lb (5.96 kg)', ...BOTTLE_SHIPPING_DEFAULTS },
+      statusBase: 'Kosher (OU), Vegetarian, Vegan',
+      hasGRAS: false, lineType: 'bottle',
+    },
+    'Shelf Stable Smooth Pourable Fruit': {
+      processing: 'Product is pasteurized following FDA guidelines for Juice HACCP: 21 CFR part 120.',
+      micro: MICRO_STANDARD, metal: METAL_STANDARD,
+      packaging: 'Polypropylene (PP) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.',
+      lotCode: LOT_A_TEXT,
+      storage: 'Product is shelf stable, no refrigeration is necessary for food safety of unopened bottles.\nRefrigerate after opening and use within 30 days after opening.',
+      bestUsedBy: ['12 months at ambient in original unopened containers.'],
+      daysAfterOpening: 30,
+      pieceSize: 'Pourable and smooth',
+      shippingDefaults: { casePack: '6 - 32 fl oz plastic bottles', grossWt: '15.59 lb (7.07 kg)', netWt: '14.19 lb (6.44 kg)', ...BOTTLE_SHIPPING_DEFAULTS },
+      statusBase: 'Kosher (OU), Vegetarian, Vegan',
+      hasGRAS: false, lineType: 'shelf-stable-bottle',
+    },
+    'Shelf Stable Beverage Concentrate': {
+      processing: 'Product is pasteurized following FDA guidelines for Juice HACCP: 21 CFR part 120.',
+      micro: MICRO_STANDARD, metal: METAL_STANDARD,
+      packaging: 'Polypropylene (PP) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.',
+      lotCode: LOT_A_TEXT,
+      storage: 'Product is shelf stable, no refrigeration is necessary for food safety of unopened bottles.\nRefrigerate after opening and use within 30 days after opening.',
+      bestUsedBy: ['12 months at ambient in original unopened containers.'],
+      daysAfterOpening: 30,
+      pieceSize: null,
+      shippingDefaults: { casePack: '6 – 32 fl oz plastic bottles', grossWt: '16.75 lb (7.60 kg)', netWt: '15.35 lb (6.96 kg)', ...BOTTLE_SHIPPING_DEFAULTS },
+      statusBase: 'Kosher (OU), Vegetarian, Vegan',
+      hasGRAS: false, lineType: 'shelf-stable-bottle',
+    },
+    'Frozen Compote': {
+      processing: 'Product is processed following FDA guidelines for Juice HACCP: 21 CFR part 120.',
+      micro: MICRO_COMPOTE, metal: METAL_STANDARD,
+      packaging: 'Contains High Density Polyethylene (HDPE) pail and tamper evident lid. 1 gallon pail with 8 lbs net weight. Stack model 10 cases per layer and 6 layers per pallet, 60 cases per pallet and a total of 120 pails per pallet. Lot code, time of fill, and best by date are printed on the pail. Product code and production lot code are printed on the pail label. Product code, production lot code, and GTIN are printed on the case label.',
+      lotCode: LOT_A_PAIL,
+      storage: 'Store and ship frozen at or below -0°F (-18°C). To use, thaw refrigerated 12 - 24 hours.',
+      bestUsedBy: ['30 months when stored frozen in original unopened containers.'],
+      daysAfterOpening: null,
+      useWithinAfterThaw: '5 months after removal from frozen storage and store in refrigerator',
+      pieceSize: null,
+      shippingDefaults: { casePack: '2 - 8 lbs. plastic pails in 1 case', grossWt: '17.78 lbs', netWt: '16 lbs', caseDims: '16.875”L × 8.625”W × 8.625”H', caseCube: '0.726 ft³', casesPerPallet: '60', casesPerLayer: '10', layersPerPallet: '6' },
+      statusBase: 'Kosher (OU), Vegetarian, Vegan',
+      hasGRAS: false, lineType: 'compote',
+    },
+    'Aseptic Puree': {
+      processing: 'Puree is pasteurized at 195˚F or higher for a minimum of 30 seconds for commercial sterility. Puree is cooled and aseptically packaged. Aseptic puree is guaranteed to comply with FDA, Juice HACCP: 21 CFR Part 120, applicable state and local laws and regulations.',
+      micro: MICRO_ASEPTIC, metal: METAL_STANDARD,
+      packaging: 'Aseptic metalized bag in 55 gallon steel drum with tamper-evident seal; drums double-lined with blue, food grade poly-liners.',
+      lotCode: LOT_B_TEXT,
+      storage: '18 months shelf life at ambient temperatures (<75°F). Product is commercial sterile and shelf stable, no refrigeration is necessary for food safety of unopened bags. Refrigerated storage is recommended to maintain optimal color. Opened packages must be frozen to prevent spoilage.',
+      bestUsedBy: null,
+      daysAfterOpening: null,
+      pieceSize: null,
+      shippingDefaults: { drumNetWt: '425 lbs (192.8 kg)', drumGrossWt: '465 lbs (210.9 kg)', drumsPerPallet: '4', toteNetWt: '2300 lbs (1043.1 kg)', toteGrossWt: '2450 lbs (1111 kg)', totesPerPallet: '1' },
+      statusBase: 'Aseptic, Kosher (Orthodox Union), Vegetarian, Vegan',
+      hasGRAS: true, lineType: 'aseptic',
+    },
+    'Canned Fruit': {
+      processing: null,
+      micro: null, metal: METAL_CANNED,
+      packaging: 'A dark fruit three piece can with a welded side seam protected by a powdered stripe and a double interior enamel finish.\nEight (8) cans in a shrink wrapped, corrugated tray.',
+      lotCode: LOT_C_TEXT,
+      storage: 'Product is commercially sterile and shelf stable when stored at ambient (70°F) temperatures. For best quality, use within two (2) years of processing.',
+      bestUsedBy: null,
+      daysAfterOpening: null,
+      pieceSize: null,
+      shippingDefaults: { canSize: '300 × 407' },
+      statusBase: 'Kosher, Vegetarian, Vegan, Product of USA',
+      hasGRAS: false, lineType: 'canned',
+    },
+    'Cocktail Cherries': {
+      processing: 'Dark Sweet Cherries are prepared with cherries that have been preserved, sized, pitted, sorted, then packed in a sweetened syrup, bottled, and pasteurized.',
+      micro: MICRO_COCKTAIL, metal: METAL_COCKTAIL,
+      packaging: '10 oz and 29 oz wide mouth glass jars with black enameled metal lug cap closure.',
+      lotCode: LOT_C_COCKTAIL,
+      storage: 'Product is shelf stable when stored at ambient (70°F) temperatures. Shelf life is 3 years from date of manufacture. Do not refrigerate.',
+      bestUsedBy: null,
+      daysAfterOpening: null,
+      pieceSize: null,
+      shippingDefaults: {},
+      statusBase: 'Kosher, Vegetarian, Vegan',
+      hasGRAS: false, lineType: 'cocktail',
+    },
+  };
+
+  /* ── Spec sheet modal open ─────────────────────────────────── */
+  /* Description defaults per product line */
+  const DESCRIPTION_DEFAULTS = {
+    'Frozen Compote': '{FRUIT} compote is made from {FRUIT} pieces blended with a thickened, sweetened sauce, pasteurized, and individually quick frozen.',
+    'Frozen Diced Pourable Fruit': '{FRUIT} sauce is made from diced {FRUIT} pieces blended with a thickened, sweetened sauce, pasteurized, and individually quick frozen.',
+    'Frozen Smooth Pourable Fruit': '{FRUIT} purée is mixed with a thickened, sweetened sauce and pasteurized. The product is then individually quick frozen.',
+    'Shelf Stable Smooth Pourable Fruit': '{FRUIT} purée is mixed with a thickened, sweetened sauce, pasteurized, and hot filled into bag-in-box containers.',
+    'Shelf Stable Beverage Concentrate': '{FRUIT} juice concentrate is blended with natural flavors and other ingredients, pasteurized, and hot filled into containers.',
+    'Aseptic Puree': '{FRUIT} purée is prepared from fresh or previously frozen {FRUIT}, processed to remove seeds and skins, pasteurized, and aseptically filled into sterile containers.',
+    'Canned Fruit': '{FRUIT} is packed with {water/light syrup/juice} and heat processed in hermetically sealed cans.',
+    'Cocktail Cherries': 'Maraschino-style cocktail cherries are prepared from bleached cherries in a sweetened, artificially colored and flavored solution.',
+  };
+
+  function openSpecSheetModal() {
+    if (!wb) { alert('No formula open.'); return; }
+    if (!wb.productLine) { alert('Please select a Product Line in the formula editor before generating a spec sheet.'); return; }
+    const tpl = SPEC_TEMPLATES[wb.productLine];
+    if (!tpl) { alert('No template found for product line: ' + wb.productLine); return; }
+
+    // Pre-fill fields from formula
+    const ver = wb.versions[selIdx];
+
+    el('ss-product-name').textContent = wb.productName || '';
+    el('ss-product-line').textContent = wb.productLine || '';
+    el('ss-item-number').value = '';
+    el('ss-gtin').value = '';
+    el('ss-description').value = '';
+    el('ss-country').value = 'domestic and imported';
+    el('ss-brix-min').value = '';
+    el('ss-brix-max').value = '';
+    el('ss-ph-min').value = '';
+    el('ss-ph-max').value = '';
+    el('ss-viscosity').value = ver.testedVisc || '';
+    el('ss-color').value = '';
+    el('ss-flavor').value = '';
+    el('ss-gross-wt').value = tpl.shippingDefaults.grossWt || '';
+    el('ss-net-wt').value = tpl.shippingDefaults.netWt || '';
+    el('ss-days-after-opening').value = tpl.daysAfterOpening ?? '';
+
+    // Pre-fill Brix/pH from tested values if available
+    if (ver.testedBrix) { el('ss-brix-min').value = ver.testedBrix; el('ss-brix-max').value = ver.testedBrix; }
+    if (ver.testedPh)   { el('ss-ph-min').value = ver.testedPh;   el('ss-ph-max').value = ver.testedPh; }
+
+    // Show/hide line-specific fields
+    el('ss-row-piece-size').style.display = (wb.productLine === 'Frozen Diced Pourable Fruit') ? '' : 'none';
+    el('ss-row-aroma').style.display      = (wb.productLine === 'Aseptic Puree') ? '' : 'none';
+    el('ss-row-specific-gravity').style.display = (wb.productLine === 'Aseptic Puree') ? '' : 'none';
+    el('ss-row-days-after-opening').style.display = (tpl.daysAfterOpening !== null) ? '' : 'none';
+    el('ss-row-weights').style.display = (tpl.lineType !== 'aseptic' && tpl.lineType !== 'canned' && tpl.lineType !== 'cocktail') ? '' : 'none';
+
+    // Line-specific fields
+    const isAseptic  = (wb.productLine === 'Aseptic Puree');
+    const isCocktail = (wb.productLine === 'Cocktail Cherries');
+    const isCanned   = (wb.productLine === 'Canned Fruit');
+    el('ss-row-defects').style.display       = isAseptic  ? '' : 'none';
+    el('ss-row-pack-format').style.display   = isAseptic  ? '' : 'none';
+    el('ss-row-pits-stems').style.display    = isCocktail ? '' : 'none';
+    el('ss-row-ing-prior-pkg').style.display = isCanned   ? '' : 'none';
+    el('ss-row-can-specs').style.display     = isCanned   ? '' : 'none';
+    if (isAseptic) {
+      el('ss-defects').value     = 'Free from foreign material, including insect and rodent damage';
+      el('ss-pack-format').value = 'drum';
+    }
+    if (isCocktail) {
+      el('ss-pits-stems').value = 'Machine pitted. Not to exceed more than one pit per 20 lb. May contain pit fragments.';
+    }
+    el('ss-ing-prior-pkg').value = '';
+
+    // Build ingredient statement preview
+    const ingStatement = _buildIngredientStatement(ver);
+    el('ss-ingredients-preview').textContent = ingStatement;
+
+    openModal('modal-specsheet');
+  }
+
+  function fillDescriptionDefault() {
+    if (!wb || !wb.productLine) { alert('Select a Product Line in the formula editor first.'); return; }
+    const def = DESCRIPTION_DEFAULTS[wb.productLine];
+    if (!def) { alert('No default description for this product line.'); return; }
+    el('ss-description').value = def;
+    el('ss-description').focus();
+    el('ss-description').select();
+  }
+
+  function toggleLineHelp(btn) {
+    const panel = btn.nextElementSibling;
+    if (!panel || !panel.classList.contains('line-help-panel')) return;
+    const isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    btn.textContent = isOpen ? '❓ Help' : '✕ Close';
+    if (!isOpen) {
+      const closer = (e) => {
+        if (!panel.contains(e.target) && e.target !== btn) {
+          panel.style.display = 'none';
+          btn.textContent = '❓ Help';
+          document.removeEventListener('click', closer, true);
+        }
+      };
+      setTimeout(() => document.addEventListener('click', closer, true), 10);
+    }
+  }
+
+  function _buildIngredientStatement(ver) {
+    return [...ver.ingredients]
+      .sort((a, b) => b.pct - a.pct)
+      .map(i => i.description)
+      .filter(Boolean)
+      .join(', ') + '.';
+  }
+
+  function _statusLine(tpl, country) {
+    if (tpl.lineType === 'canned' || tpl.lineType === 'cocktail') return tpl.statusBase + '.';
+    const origin = country === 'USA' ? 'Product of USA.' : `Product of USA, made from ${country} fruit.`;
+    return `${tpl.statusBase}, ${origin}`;
+  }
+
+  let _pendingSpecData = null;
+
+  function _collectSpecData() {
+    if (!wb) return null;
+    const ver = wb.versions[selIdx];
+    return {
+      productName:  wb.productName,
+      productLine:  wb.productLine,
+      customer:     wb.customer,
+      itemNumber:   el('ss-item-number').value.trim() || 'TBD',
+      gtin:         el('ss-gtin').value.trim() || 'TBD',
+      description:  el('ss-description').value.trim(),
+      country:      el('ss-country').value,
+      brixMin:      el('ss-brix-min').value.trim(),
+      brixMax:      el('ss-brix-max').value.trim(),
+      phMin:        el('ss-ph-min').value.trim(),
+      phMax:        el('ss-ph-max').value.trim(),
+      viscosity:    el('ss-viscosity').value.trim(),
+      color:        el('ss-color').value.trim(),
+      flavor:       el('ss-flavor').value.trim(),
+      aroma:        el('ss-aroma').value.trim(),
+      specificGravity: el('ss-specific-gravity').value.trim(),
+      pieceSize:    el('ss-piece-size').value.trim(),
+      defects:      el('ss-defects').value.trim(),
+      packFormat:   el('ss-pack-format').value,
+      pitsStemsNote: el('ss-pits-stems').value.trim(),
+      ingPriorPkg:  el('ss-ing-prior-pkg').value.trim(),
+      grossWt:      el('ss-gross-wt').value.trim(),
+      netWt:        el('ss-net-wt').value.trim(),
+      daysAfterOpening: el('ss-days-after-opening').value.trim(),
+      ingredients:  _buildIngredientStatement(ver),
+      verLabel:     ver.label,
+    };
+  }
+
+  function showSpecSheetSummary() {
+    if (!wb) return;
+    const tpl = SPEC_TEMPLATES[wb.productLine];
+    if (!tpl) return;
+    _pendingSpecData = _collectSpecData();
+    closeModal('modal-specsheet');
+
+    const d = _pendingSpecData;
+    const brixRange = (d.brixMin && d.brixMax) ? d.brixMin + '° – ' + d.brixMax + '°' : (d.brixMin || d.brixMax || '—');
+    const phRange   = (d.phMin && d.phMax)     ? d.phMin + ' – ' + d.phMax : (d.phMin || d.phMax || '—');
+    const isAseptic  = d.productLine === 'Aseptic Puree';
+    const isCocktail = d.productLine === 'Cocktail Cherries';
+    const isCanned   = d.productLine === 'Canned Fruit';
+    const isDiced    = d.productLine === 'Frozen Diced Pourable Fruit';
+    const showWts    = tpl.lineType !== 'aseptic' && tpl.lineType !== 'canned' && tpl.lineType !== 'cocktail';
+    const pfLabel = { drum: 'Drum (55 gal)', tote: 'IBC Tote (275 gal)', both: 'Drum and IBC Tote' }[d.packFormat] || '';
+    const countryLabel = { 'domestic and imported': 'Domestic and imported', 'imported': 'Imported', 'USA': 'USA only' }[d.country] || d.country;
+
+    function row(label, value, show) {
+      if (show === false) return '';
+      if (!value && show !== true) return '';
+      return '<tr><td style="font-weight:600;padding:3px 10px 3px 0;width:46%;vertical-align:top;white-space:nowrap;">' +
+        _escHtml(label) + '</td><td style="padding:3px 0;color:var(--text-muted);">' + _escHtml(String(value || '')) + '</td></tr>';
+    }
+
+    const tableRows = [
+      row('Product Name', d.productName),
+      row('Product Line', d.productLine),
+      row('Customer', d.customer),
+      row('Item Number', d.itemNumber),
+      d.gtin !== 'TBD' ? row('GTIN', d.gtin) : '',
+      row('Description', d.description || '(none provided)'),
+      row('Country of Origin', countryLabel),
+      row('Brix', brixRange),
+      row('pH', phRange),
+      row('Viscosity', d.viscosity),
+      row('Color', d.color),
+      row('Flavor', d.flavor),
+      isAseptic  ? row('Aroma', d.aroma) : '',
+      isAseptic  ? row('Specific Gravity', d.specificGravity) : '',
+      isAseptic  ? row('Defects', d.defects) : '',
+      isAseptic  ? row('Pack Format', pfLabel) : '',
+      isDiced    ? row('Piece Size', d.pieceSize) : '',
+      isCocktail ? row('Pits / Stems', d.pitsStemsNote) : '',
+      isCanned   ? row('Ingredient Prior to Pkg (%)', d.ingPriorPkg) : '',
+      showWts    ? row('Gross Ship Weight', d.grossWt) : '',
+      showWts    ? row('Net Weight', d.netWt) : '',
+      d.daysAfterOpening ? row('Days After Opening', d.daysAfterOpening + ' days') : '',
+      row('Formula Version', d.verLabel),
+    ].filter(Boolean).join('');
+
+    el('ss-confirm-body').innerHTML =
+      '<table style="width:100%;border-collapse:collapse;">' +
+      '<thead><tr><td colspan="2" style="font-weight:700;font-size:13px;padding-bottom:6px;border-bottom:2px solid var(--border);">Spec Sheet Summary</td></tr></thead>' +
+      '<tbody>' + tableRows + '</tbody></table>' +
+      '<div style="margin-top:10px;padding:8px 10px;background:var(--yellow-light);border:1px solid var(--yellow-dark);border-radius:4px;font-size:11px;">' +
+      '<strong>Ingredients (auto-built):</strong> ' + _escHtml(d.ingredients) + '</div>';
+
+    openModal('modal-specsheet-confirm');
+  }
+
+  function backToSpecSheet() {
+    closeModal('modal-specsheet-confirm');
+    openModal('modal-specsheet');
+  }
+
+  async function finalizeSpecSheet() {
+    if (!_pendingSpecData || !wb) return;
+    const tpl = SPEC_TEMPLATES[wb.productLine];
+    if (!tpl) return;
+    closeModal('modal-specsheet-confirm');
+    el('hdr-savestatus').textContent = 'Generating spec sheet…';
+    try {
+      await _buildAndDownloadSpecSheet(_pendingSpecData, tpl);
+      el('hdr-savestatus').textContent = 'Spec sheet downloaded ✓';
+      setTimeout(() => { el('hdr-savestatus').textContent = ''; }, 4000);
+    } catch(err) {
+      console.error('Spec sheet generation error:', err);
+      el('hdr-savestatus').textContent = 'Spec sheet error — see console';
+    }
+    _pendingSpecData = null;
+  }
+
+  // Legacy alias
+  async function confirmGenerateSpecSheet() { return showSpecSheetSummary(); }
+
+  async function _buildAndDownloadSpecSheet(data, tpl) {
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+      Header, Footer, AlignmentType, BorderStyle, WidthType, ShadingType,
+      TabStopType, ImageRun, VerticalAlign } = window.docx;
+
+    const FONT = 'Calibri';
+    const BODY_SIZE = 20;
+    const VALUE_TAB = 2000;
+    const SECTION_GAP = 200;
+    const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+    const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder };
+    const border = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+    const borders = { top: border, bottom: border, left: border, right: border };
+
+    // Logo
+    const logoBytes = Uint8Array.from(atob(OFC_LOGO_B64), c => c.charCodeAt(0));
+
+    function run(text, opts = {}) {
+      return new TextRun({ text: String(text || ''), font: FONT, size: BODY_SIZE, bold: opts.bold ?? false, italics: opts.italic ?? false, color: opts.color ?? '000000' });
+    }
+    function spacer(pts = 80) { return new Paragraph({ spacing: { after: pts }, children: [] }); }
+    function labelValue(label, value) {
+      return new Paragraph({ spacing: { after: 60 }, tabStops: [{ type: TabStopType.LEFT, position: VALUE_TAB }], children: [run(label, { bold: true }), run('\t'), run(value)] });
+    }
+    function labelMultiline(label, body) {
+      return new Paragraph({ spacing: { after: 80 }, indent: { left: VALUE_TAB, hanging: VALUE_TAB }, tabStops: [{ type: TabStopType.LEFT, position: VALUE_TAB }], children: [run(label, { bold: true }), run('\t'), run(body)] });
+    }
+    function labelDropline(label, body) {
+      return [
+        new Paragraph({ spacing: { after: 0 }, children: [run(label, { bold: true })] }),
+        new Paragraph({ spacing: { after: 80 }, indent: { left: VALUE_TAB }, children: [run(body)] }),
+      ];
+    }
+    function sectionHeader(text) {
+      return new Paragraph({ spacing: { before: SECTION_GAP, after: 80 }, children: [run(text, { bold: true })] });
+    }
+    function subRow(label, value) {
+      return new Paragraph({ spacing: { after: 0 }, indent: { left: VALUE_TAB }, tabStops: [{ type: TabStopType.LEFT, position: VALUE_TAB + 1800 }], children: [run(label), run('\t'), run(value)] });
+    }
+    function shipRow(label, value) {
+      return new Paragraph({ spacing: { after: 0 }, indent: { left: VALUE_TAB }, tabStops: [{ type: TabStopType.LEFT, position: VALUE_TAB + 1600 }], children: [run(label), run('\t'), run(value)] });
+    }
+    function metalRow(name, value) {
+      return new Paragraph({ spacing: { after: 0 }, indent: { left: VALUE_TAB }, tabStops: [{ type: TabStopType.LEFT, position: VALUE_TAB + 1700 }], children: [run('• ' + name), run('\t'), run(value)] });
+    }
+    function indented(text) {
+      return new Paragraph({ spacing: { after: 60 }, indent: { left: VALUE_TAB }, children: [run(text)] });
+    }
+    function cell(text, opts = {}) {
+      return new TableCell({ borders, width: { size: opts.width, type: WidthType.DXA }, margins: { top: 60, bottom: 60, left: 100, right: 100 }, children: [new Paragraph({ alignment: opts.align ?? AlignmentType.LEFT, children: [run(text, { bold: opts.bold ?? false })] })] });
+    }
+
+    // ── Header ──────────────────────────────────────────────
+    const OUTER_W = 2500, TOTAL_W = 9360, MID_W = TOTAL_W - 2 * OUTER_W;
+    const headerTable = new Table({
+      width: { size: TOTAL_W, type: WidthType.DXA }, columnWidths: [OUTER_W, MID_W, OUTER_W],
+      borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder },
+      rows: [new TableRow({ children: [
+        new TableCell({ borders: noBorders, width: { size: OUTER_W, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 0, bottom: 0, left: 0, right: 0 }, children: [new Paragraph({ spacing: { after: 0 }, children: [new ImageRun({ data: logoBytes, transformation: { width: 130, height: 50 }, type: 'png' })] })] }),
+        new TableCell({ borders: noBorders, width: { size: MID_W, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 0, bottom: 0, left: 0, right: 0 }, children: [
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [new TextRun({ text: 'The Oregon Fruit Company', font: FONT, size: 28, bold: true })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [new TextRun({ text: '3180 22nd St SE, Salem, OR  97302 USA', font: FONT, size: 20 })] }),
+        ]}),
+        new TableCell({ borders: noBorders, width: { size: OUTER_W, type: WidthType.DXA }, children: [new Paragraph({ spacing: { after: 0 }, children: [] })] }),
+      ]})],
+    });
+    const docHeader = new Header({ children: [headerTable, new Paragraph({ spacing: { after: 0 }, children: [] })] });
+
+    // ── Footer ──────────────────────────────────────────────
+    const productCode = data.productName.substring(0, 40);
+    const docFooter = new Footer({ children: [
+      new Paragraph({ spacing: { after: 0 }, tabStops: [{ type: TabStopType.RIGHT, position: TOTAL_W }], children: [run(productCode), run('\t'), run('Revised:  ')] }),
+      new Paragraph({ spacing: { after: 0 }, tabStops: [{ type: TabStopType.RIGHT, position: TOTAL_W }], children: [run(''), run('\t'), run('Replaces:  ')] }),
+    ]});
+
+    const children = [];
+
+    // Title block
+    const thickBorder = { style: BorderStyle.SINGLE, size: 24, color: '000000' };
+    children.push(new Table({
+      width: { size: TOTAL_W, type: WidthType.DXA }, columnWidths: [TOTAL_W],
+      borders: { top: thickBorder, bottom: thickBorder, left: noBorder, right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder },
+      rows: [new TableRow({ children: [new TableCell({
+        borders: { top: thickBorder, bottom: thickBorder, left: noBorder, right: noBorder },
+        width: { size: TOTAL_W, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 0, right: 0 },
+        children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [new TextRun({ text: 'PRODUCT SPECIFICATION', font: FONT, size: 28, bold: true })] })],
+      })] })],
+    }));
+    children.push(spacer(160));
+
+    // Core identification
+    children.push(labelValue('PRODUCT:', data.productName));
+    children.push(spacer(60));
+    children.push(labelValue('ITEM NUMBER:', data.itemNumber));
+    children.push(spacer(60));
+    if (data.description) children.push(labelMultiline('DESCRIPTION:', data.description));
+    children.push(spacer(60));
+    children.push(labelMultiline('INGREDIENTS:', data.ingredients));
+    if (tpl.processing) {
+      tpl.processing.split('\n').forEach((line, i) => {
+        if (i === 0) children.push(labelMultiline('PROCESSING:', line));
+        else children.push(indented(line));
+      });
+    }
+
+    // Physical properties
+    const brixRange = (data.brixMin && data.brixMax) ? `${data.brixMin}° – ${data.brixMax}°` : (data.brixMin || data.brixMax || 'TBD');
+    const phRange   = (data.phMin && data.phMax)   ? `${data.phMin} – ${data.phMax}` : (data.phMin || data.phMax || 'TBD');
+    const physHeader = tpl.lineType === 'aseptic'
+      ? 'PHYSICAL PROPERTIES: (physical properties vary due to seasonal variation of agricultural commodities)'
+      : 'PHYSICAL PROPERTIES:';
+    children.push(sectionHeader(physHeader));
+    children.push(subRow('Brix:', brixRange));
+    children.push(subRow('pH:', phRange));
+    if (data.viscosity) children.push(subRow('Viscosity:', data.viscosity));
+    if (tpl.lineType === 'aseptic' && data.specificGravity) children.push(subRow('Specific Gravity:', data.specificGravity));
+    if (tpl.pieceSize) children.push(subRow('Piece Size:', tpl.pieceSize));
+    if (data.pieceSize) children.push(subRow('Piece Size:', data.pieceSize));
+    if (data.color) children.push(subRow('Color:', data.color));
+    if (data.flavor) children.push(subRow('Flavor:', data.flavor));
+    if (tpl.lineType === 'aseptic' && data.aroma) children.push(subRow('Aroma:', data.aroma));
+    if (tpl.lineType === 'aseptic' && data.defects) children.push(subRow('Defects:', data.defects));
+    if (tpl.lineType === 'cocktail' && data.pitsStemsNote) children.push(subRow('Pits / Stems:', data.pitsStemsNote));
+    if (tpl.lineType === 'canned' && data.ingPriorPkg) children.push(subRow('Ingredient Prior to Packaging:', data.ingPriorPkg));
+    if (tpl.lineType === 'canned') {
+      children.push(subRow('Center Temp after retort:', '≥ 200°F'));
+      children.push(subRow('Vacuum:', '2–8 in Hg'));
+      children.push(subRow('Headspace:', '3/16 – 3/8 in'));
+    }
+
+    // Micro specs
+    if (tpl.micro) {
+      children.push(sectionHeader('MICROBIOLOGICAL SPECIFICATIONS:'));
+      const microW = 7400, microColW = [2200, 1700, 3500];
+      children.push(new Table({
+        width: { size: microW, type: WidthType.DXA }, columnWidths: microColW,
+        indent: { size: VALUE_TAB, type: WidthType.DXA },
+        rows: [
+          new TableRow({ children: [cell('Test', { width: microColW[0], bold: true, align: AlignmentType.CENTER }), cell('Limit', { width: microColW[1], bold: true, align: AlignmentType.CENTER }), cell('Method', { width: microColW[2], bold: true, align: AlignmentType.CENTER })] }),
+          ...tpl.micro.map(r => new TableRow({ children: [cell(r[0], { width: microColW[0] }), cell(r[1], { width: microColW[1], align: AlignmentType.CENTER }), cell(r[2], { width: microColW[2] })] })),
+        ],
+      }));
+    }
+
+    // Metal detection
+    children.push(sectionHeader('METAL DETECTION:'));
+    children.push(indented(tpl.metal.intro));
+    children.push(metalRow('Ferrous', tpl.metal.ferrous));
+    children.push(metalRow('Non-Ferrous', tpl.metal.nonFerrous));
+    children.push(metalRow('Stainless Steel', tpl.metal.ss));
+
+    // Packaging
+    children.push(sectionHeader('PACKAGING:'));
+    tpl.packaging.split('\n').forEach(line => children.push(indented(line)));
+    if (tpl.lineType === 'aseptic' && data.packFormat) {
+      const pfLabel = { drum: 'Drum (55 gal / 208 L)', tote: 'IBC Tote (275 gal / 1040 L)', both: 'Drum (55 gal / 208 L) and IBC Tote (275 gal / 1040 L)' }[data.packFormat] || '';
+      if (pfLabel) children.push(indented('Pack Format: ' + pfLabel));
+    }
+
+    // Lot code
+    children.push(sectionHeader('LOT CODE FORMAT:'));
+    tpl.lotCode.forEach(line => children.push(indented(line)));
+
+    // GTIN (bottle lines)
+    if (tpl.lineType !== 'aseptic' && tpl.lineType !== 'canned' && tpl.lineType !== 'cocktail') {
+      children.push(spacer(80));
+      children.push(labelValue('GTIN:', data.gtin));
+    }
+
+    // Status
+    children.push(spacer(80));
+    children.push(labelMultiline('STATUS:', _statusLine(tpl, data.country)));
+
+    // Best used by + storage
+    if (tpl.lineType === 'aseptic') {
+      children.push(spacer(80));
+      children.push(labelMultiline('EXPIRY AND STORAGE:', tpl.storage));
+    } else if (tpl.bestUsedBy) {
+      children.push(spacer(80));
+      children.push(labelMultiline('BEST USED BY:', tpl.bestUsedBy[0]));
+      if (data.daysAfterOpening) children.push(indented(`Use within ${data.daysAfterOpening} days after removal from frozen storage.`));
+      children.push(spacer(60));
+      tpl.storage.split('\n').forEach((line, i) => {
+        if (i === 0) children.push(labelMultiline('STORAGE:', line));
+        else children.push(indented(line));
+      });
+      if (data.daysAfterOpening && tpl.lineType !== 'shelf-stable-bottle') {
+        children.push(indented(`Refrigerate after opening and use within ${data.daysAfterOpening} days after removal from frozen storage and opened.`));
+      }
+    } else {
+      children.push(spacer(80));
+      children.push(labelMultiline('STORAGE:', tpl.storage));
+    }
+
+    // Shipping info (bottle lines)
+    const sd = tpl.shippingDefaults;
+    if (tpl.lineType === 'bottle' || tpl.lineType === 'shelf-stable-bottle') {
+      children.push(sectionHeader('SHIPPING INFORMATION:'));
+      children.push(shipRow('Case Pack:', sd.casePack));
+      children.push(shipRow('Gross Ship Wt:', data.grossWt || sd.grossWt));
+      children.push(shipRow('Net Wt:', data.netWt || sd.netWt));
+      children.push(shipRow('Case Dimensions:', sd.caseDims));
+      children.push(shipRow('Case Cube:', sd.caseCube));
+      children.push(shipRow('Cases/Pallet:', sd.casesPerPallet));
+      children.push(shipRow('Cases/Layer:', sd.casesPerLayer));
+      children.push(shipRow('Layers/Pallet:', sd.layersPerPallet));
+    } else if (tpl.lineType === 'compote') {
+      children.push(sectionHeader('SHIPPING INFORMATION:'));
+      children.push(shipRow('Case Pack:', sd.casePack));
+      children.push(shipRow('Gross Ship Wt:', data.grossWt || sd.grossWt));
+      children.push(shipRow('Net Wt:', data.netWt || sd.netWt));
+      children.push(shipRow('Case Dimensions:', sd.caseDims));
+      children.push(shipRow('Case Cube:', sd.caseCube));
+      children.push(shipRow('Cases/Pallet:', sd.casesPerPallet));
+      children.push(shipRow('Cases/Layer:', sd.casesPerLayer));
+      children.push(shipRow('Layers/Pallet:', sd.layersPerPallet));
+    }
+
+    // Boilerplate
+    children.push(spacer(120));
+    children.push(labelMultiline('ALLERGENS:', ALLERGEN_TEXT));
+    children.push(labelMultiline('NON-GMO:', NONGMO_TEXT));
+    labelDropline('SAFETY DATA SHEET (SDS):', SDS_TEXT).forEach(p => children.push(p));
+
+    // GRAS (aseptic only)
+    if (tpl.hasGRAS) {
+      children.push(spacer(60));
+      children.push(labelMultiline('GRAS:', `${data.productName} is generally recognized as safe as defined in 21 CFR 170.30(b)(2).`));
+    }
+
+    // Nutrition placeholder
+    children.push(sectionHeader('NUTRITIONAL INFORMATION:'));
+    const phBorder = { style: BorderStyle.SINGLE, size: 4, color: 'AAAAAA' };
+    children.push(new Table({
+      width: { size: 6840, type: WidthType.DXA }, columnWidths: [6840],
+      indent: { size: VALUE_TAB, type: WidthType.DXA },
+      rows: [new TableRow({ children: [new TableCell({
+        borders: { top: phBorder, left: phBorder, bottom: phBorder, right: phBorder },
+        width: { size: 6840, type: WidthType.DXA }, margins: { top: 240, bottom: 240, left: 200, right: 200 },
+        children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '[Insert Nutrition Facts panel here]', font: FONT, size: BODY_SIZE, italics: true, color: '777777' })] })],
+      })] })],
+    }));
+
+    // ── Assemble & download ──────────────────────────────────
+    const doc = new Document({
+      styles: { default: { document: { run: { font: FONT, size: BODY_SIZE } } } },
+      sections: [{ properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1080, right: 1440, bottom: 1080, left: 1440 } } }, headers: { default: docHeader }, footers: { default: docFooter }, children }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const slug = _slugify(data.productName);
+    const filename = `${slug}_spec_${data.verLabel || 'v1'}.docx`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+    // Also save to SharePoint if configured
+    if (_spConfigured() && account && wb._spPath) {
+      try {
+        const spFolder = wb._spPath.split('/').slice(0, -1).join('/');
+        const spPath = `${spFolder}/${filename}`;
+        const arrayBuf = await blob.arrayBuffer();
+        await _graphFetchBinary(spPath, arrayBuf);
+      } catch(e) { console.warn('SharePoint save of spec sheet failed (download still worked):', e); }
+    }
+  }
+
+  // Binary PUT to SharePoint (for .docx)
+  async function _graphFetchBinary(filePath, arrayBuffer) {
+    const token = await _getToken();
+    const url = `https://graph.microsoft.com/v1.0/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`;
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      body: arrayBuffer,
+    });
+    if (!res.ok) throw new Error(`Graph binary PUT ${res.status}`);
+    return res.json();
+  }
+
+    /* ── New Formula flow ───────────────────────────────── */
   async function openNewFormulaModal() {
     // Populate customer dropdown from existing SP folders
     const sel = el('nf-customer-select');
@@ -2203,17 +3056,21 @@ const App = (() => {
       });
       list.innerHTML = html;
       // Attach click handlers via JS so special characters (apostrophes, etc.) in names are never a problem
-      list.querySelectorAll('.sp-nav-folder').forEach(d => d.addEventListener('click', () => spNavigateInto(d.dataset.name)));
-      list.querySelectorAll('.sp-nav-json').forEach(d => d.addEventListener('click', () => openFromSharePoint(d.dataset.path)));
-      list.querySelectorAll('.sp-nav-xlsx').forEach(d => d.addEventListener('click', () => openXlsxFromSharePoint(d.dataset.path)));
+      list.querySelectorAll('.sp-nav-folder').forEach(item => {
+        item.addEventListener('click', () => {
+          spBrowsePath = spBrowsePath + '/' + item.dataset.name;
+          _renderSpDropdown();
+        });
+      });
+      list.querySelectorAll('.sp-nav-json').forEach(item => {
+        item.addEventListener('click', () => openFromSharePoint(item.dataset.path));
+      });
+      list.querySelectorAll('.sp-nav-xlsx').forEach(item => {
+        item.addEventListener('click', () => openXlsxFromSharePoint(item.dataset.path));
+      });
     } catch(e) {
-      list.innerHTML = `<div class="sp-drop-error">Couldn't load: ${_escHtml(e.message || String(e))}</div>`;
+      list.innerHTML = `<div class="sp-drop-error">⚠ ${e.message}</div>`;
     }
-  }
-
-  function spNavigateInto(folderName) {
-    spBrowsePath = spBrowsePath + '/' + folderName;
-    _renderSpDropdown();
   }
 
   function spNavigateUp() {
@@ -2223,122 +3080,275 @@ const App = (() => {
     _renderSpDropdown();
   }
 
+  /* ── Open formula from SharePoint (JSON) ─────────────── */
   async function openFromSharePoint(filePath) {
+    const dd = el('sp-dropdown'); if (dd) dd.style.display = 'none';
+    el('hdr-savestatus').textContent = 'Loading…';
     try {
-      const data = await Graph.readJson(filePath);
-      wb = data;
+      wb = await Graph.readJson(filePath);
       wb._spPath = filePath;
-      localStorage.setItem('ofc_last_sp_path', filePath);
       selIdx = 0;
       syncSet = new Set((wb.versions || []).map(v => v.label));
       _populateBCDatalist(wb.bcItems || []);
+      LS.set('last_sp_path', filePath);
       showScreen('app');
-      _updateUserChip();
       el('hdr-wb').textContent = (wb.productName || filePath.split('/').pop());
-      _setSaveStatus('Loaded from SharePoint');
-      const dd = el('sp-dropdown'); if (dd) dd.style.display = 'none';
+      el('hdr-user').textContent = account?.username || '';
+      el('hdr-savestatus').textContent = '';
       _render();
       loadProjects();
     } catch(e) {
-      alert('Could not load formula from SharePoint: ' + (e.message || e));
+      el('hdr-savestatus').textContent = '⚠ ' + e.message;
+      console.error('openFromSharePoint error:', e);
     }
   }
 
+  /* ── Open Excel workbook from SharePoint ─────────────── */
   async function openXlsxFromSharePoint(filePath) {
+    const dd = el('sp-dropdown'); if (dd) dd.style.display = 'none';
+    el('hdr-savestatus').textContent = 'Loading…';
     try {
-      const buffer = await Graph.readBinary(filePath);
-      const xlWb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+      const buf = await Graph.readBinary(filePath);
+      const xlWb = XLSX.read(buf, { type: 'array' });
       const sheet = _findBenchSheet(xlWb);
-      if (!sheet) throw new Error('No usable sheet found in workbook.');
+      if (!sheet) throw new Error("No Bench Top sheet found in workbook.");
+      const bcSheet = xlWb.Sheets['BC_Items'] || null;
       const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-      const bcSheet = xlWb.Sheets['BC_Items'];
-      let bcItems = [];
-      if (bcSheet) {
-        const bcAoa = XLSX.utils.sheet_to_json(bcSheet, { header: 1, defval: null });
-        bcItems = bcAoa.slice(1).filter(r => r[0] && r[1]).map(r => ({ no: String(r[0]).trim(), desc: String(r[1]).trim(), cost: r[3] || null }));
-      }
       const filename = filePath.split('/').pop();
       wb = _parseWorkbook(aoa, filename);
-      wb.bcItems = bcItems;
+      if (bcSheet) {
+        const bcAoa = XLSX.utils.sheet_to_json(bcSheet, { header: 1, defval: null });
+        wb.bcItems = _parseBcItems(bcAoa);
+      }
       wb._spPath = filePath;
-      localStorage.setItem('ofc_last_sp_path', filePath);
       selIdx = 0;
       syncSet = new Set(wb.versions.map(v => v.label));
-      _populateBCDatalist(bcItems);
+      _populateBCDatalist(wb.bcItems || []);
+      LS.set('last_sp_path', filePath);
       showScreen('app');
-      _updateUserChip();
-      el('hdr-wb').textContent = filename;
-      _setSaveStatus('Loaded from SharePoint');
-      const dd = el('sp-dropdown'); if (dd) dd.style.display = 'none';
+      el('hdr-wb').textContent = (wb.productName || filename);
+      el('hdr-user').textContent = account?.username || '';
+      el('hdr-savestatus').textContent = '';
       _render();
       loadProjects();
-    } catch(err) {
-      alert('Could not open workbook from SharePoint: ' + err.message);
+    } catch(e) {
+      el('hdr-savestatus').textContent = '⚠ ' + e.message;
+      console.error('openXlsxFromSharePoint error:', e);
     }
   }
 
-  /* ── Save to SharePoint ──────────────────────────────── */
+  function _findBenchSheet(xlWb) {
+    if (xlWb.Sheets['Bench Top']) return xlWb.Sheets['Bench Top'];
+    const normalized = Object.keys(xlWb.Sheets).find(name =>
+      name.trim().toLowerCase().replace(/\s+/g, ' ') === 'bench top'
+    );
+    if (normalized) return xlWb.Sheets[normalized];
+    return xlWb.Sheets[xlWb.SheetNames[0]] || null;
+  }
+
+  /* ── Save formula to SharePoint ──────────────────────── */
   async function saveToSharePoint() {
-    if (!wb) { alert('Open or create a formula first.'); return; }
+    if (!wb) { alert('No formula open.'); return; }
     if (!_spConfigured()) { alert('SharePoint isn\'t configured yet — see SP_SITE_ID / SP_DRIVE_ID near the top of the script.'); return; }
     if (!account) { alert('Sign in with Microsoft first.'); return; }
 
     let path = wb._spPath;
-    // If opened from an Excel file, _spPath points to .xlsx/.xlsm — don't overwrite it with JSON.
-    // Clear the path so we fall through to the "save as new .json" prompt below.
-    if (path && /\.(xlsx|xlsm)$/i.test(path)) path = null;
-
-    if (!path) {
-      // Pre-populate customer from the Excel path when available (e.g., "Formula Library/FUKU/file.xlsx" → "FUKU")
+    // If source was an Excel file, prompt for a new .json save path
+    if (path && (path.toLowerCase().endsWith('.xlsx') || path.toLowerCase().endsWith('.xlsm'))) {
       let defaultCustomer = wb.customer || '';
-      if (!defaultCustomer && wb._spPath) {
-        const parts = wb._spPath.split('/');
-        if (parts.length >= 2) defaultCustomer = parts[parts.length - 2];
+      if (!defaultCustomer) {
+        const parts = path.split('/');
+        if (parts.length >= 3) defaultCustomer = parts[parts.length - 2];
       }
-      const customer = defaultCustomer || prompt('Customer name (for the Formula Library folder):', '');
+      wb._spPath = null;
+      path = null;
+      // Fall through to first-save prompt with pre-populated customer
+      const customer = prompt('Save to which customer folder?\n(Will create if it doesn\'t exist)', defaultCustomer);
       if (!customer) return;
       const productSlug = _slugify(wb.productName);
       path = `${SP_ROOT_PATH}/${customer}/${productSlug}.json`;
-      const confirmed = confirm(`Save to:\n${path}\n\nContinue?`);
-      if (!confirmed) return;
+    } else if (!path) {
+      let defaultCustomer = wb.customer || '';
+      const customer = prompt('Save to which customer folder?\n(Will create if it doesn\'t exist)', defaultCustomer);
+      if (!customer) return;
+      const productSlug = _slugify(wb.productName);
+      path = `${SP_ROOT_PATH}/${customer}/${productSlug}.json`;
     }
 
-    _setSaveStatus('Saving…');
+    const statusEl = el('hdr-savestatus');
+    statusEl.textContent = 'Saving…';
     try {
-      const payload = Object.assign({}, wb);
-      delete payload._spPath; // internal-only, don't persist
-      await Graph.writeJson(path, payload);
+      const toSave = { ...wb };
+      delete toSave._spPath;
+      delete toSave.bcItems;
+      await Graph.writeJson(path, toSave);
       wb._spPath = path;
-      localStorage.setItem('ofc_last_sp_path', path);
-      _setSaveStatus('Saved ' + new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}));
+      const t = new Date();
+      statusEl.textContent = `Saved ${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}`;
+      LS.set('last_sp_path', path);
     } catch(e) {
-      _setSaveStatus('');
-      alert('Save failed: ' + (e.message || e));
+      statusEl.textContent = '⚠ Save failed';
+      console.error('saveToSharePoint error:', e);
     }
   }
 
-  function _setSaveStatus(text) {
-    const el2 = el('hdr-savestatus');
-    if (el2) el2.textContent = text;
+  /* ── Load BC items cache from SharePoint ─────────────── */
+  async function _loadBcItemsFromSharePoint() {
+    if (!_spConfigured() || !account) return;
+    try {
+      const data = await Graph.readJson(`${SP_ROOT_PATH}/_config/bc-items.json`);
+      if (Array.isArray(data)) {
+        bcItemsCache = data;
+        _populateBCDatalist(data);
+      }
+    } catch(e) {
+      console.warn('BC items cache not available:', e.message);
+    }
   }
 
-  /* ── Public API ──────────────────────────────────────── */
+  /* ── Graph / auth helpers ────────────────────────────── */
+  function _encPath(path) {
+    return path.split('/').map(encodeURIComponent).join('/');
+  }
+
+  function _slugify(s) {
+    return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  async function _getToken() {
+    const scopes = ['User.Read', 'Files.Read', 'Sites.Read.All', 'Files.ReadWrite.All', 'GroupMember.Read.All'];
+    try {
+      const res = await msalApp.acquireTokenSilent({ scopes, account });
+      return res.accessToken;
+    } catch(e) {
+      const res = await msalApp.acquireTokenPopup({ scopes });
+      return res.accessToken;
+    }
+  }
+
+  async function _graphFetch(endpoint, opts = {}) {
+    const token = await _getToken();
+    const url = 'https://graph.microsoft.com/v1.0' + endpoint;
+    const headers = { 'Authorization': 'Bearer ' + token, ...(opts.headers || {}) };
+    if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+    const res = await fetch(url, { ...opts, headers });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Graph ${res.status}: ${text.substring(0, 200)}`);
+    }
+    if (opts.method === 'PUT') return res;
+    return res.json();
+  }
+
+  const Graph = {
+    async listFolder(folderPath) {
+      const res = await _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(folderPath)}:/children?$select=name,folder,file,size,lastModifiedDateTime`);
+      return res.value || [];
+    },
+    async readJson(filePath) {
+      return _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`);
+    },
+    async readBinary(filePath) {
+      const token = await _getToken();
+      const url = `https://graph.microsoft.com/v1.0/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`;
+      const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+      if (!res.ok) throw new Error(`Graph binary read ${res.status}`);
+      return res.arrayBuffer();
+    },
+    async writeJson(filePath, obj) {
+      const res = await _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(obj),
+      });
+      return res.json();
+    },
+  };
+
+  /* ── Init / sign-in ─────────────────────────────────── */
+  const MSAL_CONFIG = {
+    auth: {
+      clientId: LS.get('azure_client_id') || '',
+      authority: `https://login.microsoftonline.com/${LS.get('tenant') || 'common'}`,
+      redirectUri: window.location.origin + window.location.pathname,
+    },
+    cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
+  };
+
+  async function _initMsal() {
+    const clientId = LS.get('azure_client_id');
+    const tenant   = LS.get('tenant');
+    if (!clientId || !tenant) return;
+    try {
+      msalApp = new msal.PublicClientApplication({
+        auth: { clientId, authority: `https://login.microsoftonline.com/${tenant}`, redirectUri: window.location.origin + window.location.pathname },
+        cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
+      });
+      await msalApp.initialize();
+      const accounts = msalApp.getAllAccounts();
+      if (accounts.length > 0) {
+        account = accounts[0];
+        el('hdr-user').textContent = account.username;
+        el('btn-signin').textContent = 'Sign Out';
+        // Auto-reload last opened formula
+        const lastPath = LS.get('last_sp_path');
+        if (lastPath && _spConfigured()) {
+          openFromSharePoint(lastPath).catch(() => {});
+        }
+        await _loadBcItemsFromSharePoint();
+      }
+    } catch(e) {
+      console.warn('MSAL init error:', e);
+    }
+  }
+
+  async function signIn() {
+    if (account) {
+      // Sign out
+      account = null;
+      msalApp?.logout();
+      el('hdr-user').textContent = '';
+      el('btn-signin').textContent = 'Sign In';
+      return;
+    }
+    if (!msalApp) { alert('Enter your Azure Client ID and Tenant in Settings first.'); return; }
+    try {
+      const scopes = ['User.Read', 'Files.Read', 'Sites.Read.All', 'Files.ReadWrite.All', 'GroupMember.Read.All'];
+      const res = await msalApp.loginPopup({ scopes });
+      account = res.account;
+      el('hdr-user').textContent = account.username;
+      el('btn-signin').textContent = 'Sign Out';
+      await _loadBcItemsFromSharePoint();
+    } catch(e) {
+      console.error('Sign-in error:', e);
+    }
+  }
+
+  // Boot
+  _initMsal();
+
+  /* ── Public API ─────────────────────────────────────── */
   return {
-    init, login, saveSetup, skipToLocalMode, saveSettings, openSettings,
-    openLocalFile, openRecentWb, toggleWbDropdown,
-    toggleSpDropdown, spNavigateInto, spNavigateUp, openFromSharePoint, openXlsxFromSharePoint, saveToSharePoint,
-    loadProjects, loadAsanaTasks, onProjectChange, filterTasks,
-    toggleSection, selectTask,
-    selectVersion, toggleSyncVersion, openNewVersionModal, confirmNewVersion,
-    updateWbMeta, updateVerMeta, updateIng, onItemNoInput,
-    addIngredient, removeIngredient,
-    pushToAsana, removeFormulaFromTask, copyPreview, onDescInput,
-    openModal, closeModal,
-    openNewFormulaModal, onNewFormulaCustomerChange, confirmNewFormula
+    openSettings, closeSettings, saveSettings,
+    signIn,
+    loadProjects, onProjectChange,
+    loadAsanaTasks, filterTasks, selectTask,
+    toggleVersionSync, pushToAsana,
+    addIngredient, deleteIngredient, updateIng,
+    onItemNoInput, onDescInput,
+    updateWbMeta, updateVerMeta,
+    addVersion, confirmNewVersion,
+    openLocalFile,
+    toggleWbDropdown, openRecentWb,
+    toggleSpDropdown, spNavigateUp,
+    openNewFormulaModal, onNewFormulaCustomerChange, confirmNewFormula,
+    openSpecSheetModal, showSpecSheetSummary, finalizeSpecSheet, backToSpecSheet,
+    fillDescriptionDefault, toggleLineHelp,
+    confirmGenerateSpecSheet,
+    saveToSharePoint,
+    closeModal,
   };
 })();
-
-window.addEventListener('load', () => App.init());
 </script>
 </body>
 </html>
