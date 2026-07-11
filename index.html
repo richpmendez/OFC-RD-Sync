@@ -3137,15 +3137,6 @@ const App = (() => {
     }
   }
 
-  function _findBenchSheet(xlWb) {
-    if (xlWb.Sheets['Bench Top']) return xlWb.Sheets['Bench Top'];
-    const normalized = Object.keys(xlWb.Sheets).find(name =>
-      name.trim().toLowerCase().replace(/\s+/g, ' ') === 'bench top'
-    );
-    if (normalized) return xlWb.Sheets[normalized];
-    return xlWb.Sheets[xlWb.SheetNames[0]] || null;
-  }
-
   /* ── Save formula to SharePoint ──────────────────────── */
   async function saveToSharePoint() {
     if (!wb) { alert('No formula open.'); return; }
@@ -3192,90 +3183,6 @@ const App = (() => {
     }
   }
 
-  /* ── Load BC items cache from SharePoint ─────────────── */
-  async function _loadBcItemsFromSharePoint() {
-    if (!_spConfigured() || !account) return;
-    try {
-      const data = await Graph.readJson(`${SP_ROOT_PATH}/_config/bc-items.json`);
-      if (Array.isArray(data)) {
-        bcItemsCache = data;
-        _populateBCDatalist(data);
-      }
-    } catch(e) {
-      console.warn('BC items cache not available:', e.message);
-    }
-  }
-
-  /* ── Graph / auth helpers ────────────────────────────── */
-  function _encPath(path) {
-    return path.split('/').map(encodeURIComponent).join('/');
-  }
-
-  function _slugify(s) {
-    return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  }
-
-  async function _getToken() {
-    const scopes = ['User.Read', 'Files.Read', 'Sites.Read.All', 'Files.ReadWrite.All', 'GroupMember.Read.All'];
-    try {
-      const res = await msalApp.acquireTokenSilent({ scopes, account });
-      return res.accessToken;
-    } catch(e) {
-      const res = await msalApp.acquireTokenPopup({ scopes });
-      return res.accessToken;
-    }
-  }
-
-  async function _graphFetch(endpoint, opts = {}) {
-    const token = await _getToken();
-    const url = 'https://graph.microsoft.com/v1.0' + endpoint;
-    const headers = { 'Authorization': 'Bearer ' + token, ...(opts.headers || {}) };
-    if (opts.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-    const res = await fetch(url, { ...opts, headers });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`Graph ${res.status}: ${text.substring(0, 200)}`);
-    }
-    if (opts.method === 'PUT') return res;
-    return res.json();
-  }
-
-  /* ── Init / sign-in ─────────────────────────────────── */
-  const MSAL_CONFIG = {
-    auth: {
-      clientId: LS.get('azure_client_id') || '',
-      authority: `https://login.microsoftonline.com/${LS.get('tenant') || 'common'}`,
-      redirectUri: window.location.origin + window.location.pathname,
-    },
-    cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
-  };
-
-  async function _initMsal() {
-    const clientId = LS.get('azure_client_id');
-    const tenant   = LS.get('tenant');
-    if (!clientId || !tenant) return;
-    try {
-      msalApp = new msal.PublicClientApplication({
-        auth: { clientId, authority: `https://login.microsoftonline.com/${tenant}`, redirectUri: window.location.origin + window.location.pathname },
-        cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
-      });
-      await msalApp.initialize();
-      const accounts = msalApp.getAllAccounts();
-      if (accounts.length > 0) {
-        account = accounts[0];
-        el('hdr-user').textContent = account.username;
-        el('btn-signin').textContent = 'Sign Out';
-        // Auto-reload last opened formula
-        const lastPath = LS.get('last_sp_path');
-        if (lastPath && _spConfigured()) {
-          openFromSharePoint(lastPath).catch(() => {});
-        }
-        await _loadBcItemsFromSharePoint();
-      }
-    } catch(e) {
-      console.warn('MSAL init error:', e);
-    }
-  }
 
   async function signIn() {
     if (account) {
@@ -3327,4 +3234,4 @@ const App = (() => {
 })();
 </script>
 </body>
-</html>
+</html>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
