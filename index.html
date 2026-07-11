@@ -3240,31 +3240,6 @@ const App = (() => {
     return res.json();
   }
 
-  const Graph = {
-    async listFolder(folderPath) {
-      const res = await _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(folderPath)}:/children?$select=name,folder,file,size,lastModifiedDateTime`);
-      return res.value || [];
-    },
-    async readJson(filePath) {
-      return _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`);
-    },
-    async readBinary(filePath) {
-      const token = await _getToken();
-      const url = `https://graph.microsoft.com/v1.0/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`;
-      const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
-      if (!res.ok) throw new Error(`Graph binary read ${res.status}`);
-      return res.arrayBuffer();
-    },
-    async writeJson(filePath, obj) {
-      const res = await _graphFetch(`/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(filePath)}:/content`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(obj),
-      });
-      return res.json();
-    },
-  };
-
   /* ── Init / sign-in ─────────────────────────────────── */
   const MSAL_CONFIG = {
     auth: {
