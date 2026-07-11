@@ -968,8 +968,8 @@ const PRODUCT_LINES = [
 ];
 
 const LS = {
-  get: k => localStorage.getItem('ofc_sync_' + k) || '',
-  set: (k, v) => localStorage.setItem('ofc_sync_' + k, v || '')
+  get: k => { try { return localStorage.getItem('ofc_sync_' + k) || ''; } catch(e) { return ''; } },
+  set: (k, v) => { try { localStorage.setItem('ofc_sync_' + k, v || ''); } catch(e) { console.warn('LS.set quota:', k, e); } },
 };
 
 // Task formula registry — persists across sessions
@@ -3299,8 +3299,8 @@ const App = (() => {
     }
   }
 
-  // Boot
-  _initMsal();
+  // Boot — init() handles screen routing; _initMsal handles MSAL auto-resume
+  init();
 
   /* ── Public API ─────────────────────────────────────── */
   return {
