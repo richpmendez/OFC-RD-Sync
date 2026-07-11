@@ -776,6 +776,12 @@ html, body { height: 100%; }
       <input type="text" id="nf-product" placeholder="e.g. Strawberry Puree RFR">
     </div>
     <div class="form-group">
+      <label>Product Line</label>
+      <select id="nf-productline">
+        <option value="">— Select product line —</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label>Initial Version Label</label>
       <input type="text" id="nf-version" placeholder="e.g. v1.0" value="v1.0">
     </div>
@@ -803,6 +809,17 @@ const SP_SITE_ID   = 'oregonfruitproducts.sharepoint.com,bcbcd367-96a8-44fe-86d6
 const SP_DRIVE_ID  = 'b!Z9O8vKiW_kSG1nUk3gfLPN7XqeTj05FAoQ1vLqBZoFmB09aX02wLTalnDmNg-il1';
 const SP_ROOT_PATH = 'Formula Library';
 function _spConfigured() { return SP_SITE_ID !== 'TBD' && SP_DRIVE_ID !== 'TBD' && SP_SITE_ID && SP_DRIVE_ID; }
+
+const PRODUCT_LINES = [
+  'Frozen Compote',
+  'Frozen Diced Pourable Fruit',
+  'Frozen Smooth Pourable Fruit',
+  'Shelf Stable Smooth Pourable Fruit',
+  'Shelf Stable Beverage Concentrate',
+  'Aseptic Puree',
+  'Canned Fruit',
+  'Cocktail Cherries',
+];
 
 const LS = {
   get: k => localStorage.getItem('ofc_sync_' + k) || '',
@@ -1416,6 +1433,13 @@ const App = (() => {
           <label>Product</label>
           <input class="cell-in wide" value="${_escHtml(wb.productName)}" onchange="App.updateWbMeta('productName',this.value)" style="min-width:200px;">
         </div>
+        <div class="pi-field">
+          <label>Product Line</label>
+          <select class="cell-in" onchange="App.updateWbMeta('productLine',this.value)" style="min-width:180px;">
+            <option value="">— Select —</option>
+            ${PRODUCT_LINES.map(l => `<option value="${_escHtml(l)}"${wb.productLine === l ? ' selected' : ''}>${_escHtml(l)}</option>`).join('')}
+          </select>
+        </div>
         <div style="margin-left:auto; font-size:10px; color:var(--text-muted);">${_escHtml(wb.filePath)}</div>
       </div>
 
@@ -1998,6 +2022,9 @@ const App = (() => {
     el('nf-customer-new').style.display = 'none';
     el('nf-product').value = '';
     el('nf-version').value = 'v1.0';
+    const plSel = el('nf-productline');
+    plSel.innerHTML = '<option value="">— Select product line —</option>' +
+      PRODUCT_LINES.map(l => `<option value="${_escHtml(l)}">${_escHtml(l)}</option>`).join('');
     openModal('modal-newformula');
 
     if (_spConfigured() && account) {
@@ -2022,17 +2049,18 @@ const App = (() => {
   }
 
   async function confirmNewFormula() {
-    const selVal    = el('nf-customer-select').value;
-    const customer  = selVal === '__new__' ? el('nf-customer-new').value.trim() : selVal;
-    const product   = el('nf-product').value.trim();
-    const verLabel  = el('nf-version').value.trim() || 'v1.0';
+    const selVal      = el('nf-customer-select').value;
+    const customer    = selVal === '__new__' ? el('nf-customer-new').value.trim() : selVal;
+    const product     = el('nf-product').value.trim();
+    const productLine = el('nf-productline').value;
+    const verLabel    = el('nf-version').value.trim() || 'v1.0';
 
     if (!customer) { alert('Enter a customer name.'); return; }
     if (!product)  { alert('Enter a product name.'); return; }
 
     const today = new Date().toLocaleDateString('en-US', { month:'2-digit', day:'2-digit', year:'2-digit' });
     wb = {
-      customer, productName: product,
+      customer, productName: product, productLine,
       createdOn: today, asanaTaskUrl: '', overallStatus: 'Draft',
       filePath: '', bcItems: [],
       versions: [{
