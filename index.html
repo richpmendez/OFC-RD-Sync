@@ -2570,15 +2570,23 @@ const App = (() => {
     if (!_pendingSpecData || !wb) return;
     const tpl = SPEC_TEMPLATES[wb.productLine];
     if (!tpl) return;
+    // Guard: docx library must be loaded
+    if (!window.docx || !window.docx.Packer) {
+      alert('The Word document library (docx) failed to load from CDN.\n\nPlease check your internet connection and hard-refresh the page (Ctrl+Shift+R), then try again.');
+      return;
+    }
     closeModal('modal-specsheet-confirm');
     el('hdr-savestatus').textContent = 'Generating spec sheet…';
+    let filename = '';
     try {
-      await _buildAndDownloadSpecSheet(_pendingSpecData, tpl);
+      filename = await _buildAndDownloadSpecSheet(_pendingSpecData, tpl);
       el('hdr-savestatus').textContent = 'Spec sheet downloaded ✓';
-      setTimeout(() => { el('hdr-savestatus').textContent = ''; }, 4000);
+      setTimeout(() => { el('hdr-savestatus').textContent = ''; }, 6000);
+      alert('✅ Spec sheet saved!\n\nFile: ' + (filename || 'spec_sheet.docx') + '\n\nCheck your Downloads folder (or the folder your browser saves files to).');
     } catch(err) {
       console.error('Spec sheet generation error:', err);
-      el('hdr-savestatus').textContent = 'Spec sheet error — see console';
+      el('hdr-savestatus').textContent = 'Spec sheet error';
+      alert('❌ Spec sheet generation failed:\n\n' + err.message + '\n\nOpen browser DevTools (F12 → Console) for details.');
     }
     _pendingSpecData = null;
   }
@@ -2840,8 +2848,12 @@ const App = (() => {
     const filename = `${slug}_spec_${data.verLabel || 'v1'}.docx`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return filename;
 
     // Also save to SharePoint if configured
     if (_spConfigured() && account && wb._spPath) {
