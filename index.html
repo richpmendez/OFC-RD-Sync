@@ -2580,9 +2580,17 @@ const App = (() => {
     let filename = '';
     try {
       filename = await _buildAndDownloadSpecSheet(_pendingSpecData, tpl);
-      el('hdr-savestatus').textContent = 'Spec sheet downloaded ✓';
+      if (filename === null) {
+        // User cancelled the Save dialog — restore pending data so they can retry
+        el('hdr-savestatus').textContent = '';
+        openModal('modal-specsheet-confirm');
+        return;
+      }
+      el('hdr-savestatus').textContent = 'Spec sheet saved ✓';
       setTimeout(() => { el('hdr-savestatus').textContent = ''; }, 6000);
-      alert('✅ Spec sheet saved!\n\nFile: ' + (filename || 'spec_sheet.docx') + '\n\nCheck your Downloads folder (or the folder your browser saves files to).');
+      if (!window.showSaveFilePicker) {
+        alert('✅ Spec sheet downloaded!\n\nFile: ' + (filename || 'spec_sheet.docx') + '\n\nCheck your Downloads folder.');
+      }
     } catch(err) {
       console.error('Spec sheet generation error:', err);
       el('hdr-savestatus').textContent = 'Spec sheet error';
@@ -2846,6 +2854,25 @@ const App = (() => {
     const blob = await Packer.toBlob(doc);
     const slug = _slugify(data.productName);
     const filename = `${slug}_spec_${data.verLabel || 'v1'}.docx`;
+    // Try File System Access API (Chrome/Edge) for a Save As dialog;
+    // fall back to anchor-click download for other browsers.
+    if (window.showSaveFilePicker) {
+      try {
+        const fh = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{ description: 'Word Document', accept: { 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'] } }],
+        });
+        const writable = await fh.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return fh.name;
+      } catch(e) {
+        if (e.name === 'AbortError') return null; // user cancelled — no alert
+        console.warn('showSaveFilePicker failed, falling back:', e);
+        // fall through to anchor download
+      }
+    }
+    // Fallback: trigger browser download to default Downloads folder
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename;
