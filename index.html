@@ -23798,88 +23798,74 @@ const App = (() => {
   }
 
   function _bs_fruitBatchSheet(productName, ings, numBatches, batchLbs, targetBrix) {
+    // Layout matches 'Fruit Batch Sheet FS' template:
+    //   A = ingredient name / step numbers / labels
+    //   C = unit count (#)
+    //   D = unit type (Drums/Bags)
+    //   E = LBS per batch
+    //   F onwards = batch number columns (operators initial)
     const fruitPctTotal = ings.reduce((s, i) => s + i.pct, 0);
     const ingData = ings.map(ing => {
       const lbsPerBatch = fruitPctTotal > 0 ? (ing.pct / fruitPctTotal) * batchLbs : 0;
-      const containers  = (ing.containerSize > 0 && ing.containerUnit !== 'lbs')
+      const containers = (ing.containerSize > 0 && ing.containerUnit !== 'lbs')
         ? Math.ceil(lbsPerBatch / ing.containerSize) : null;
       return { ...ing, lbsPerBatch, containers };
     });
 
-    const batchCols = [];
-    for (let i = 1; i <= Math.min(numBatches, 7); i++) batchCols.push(i);
+    const batchNums = Array.from({ length: Math.min(numBatches, 6) }, (_, i) => i + 1);
+    const hasEnzyme = ings.some(i =>
+      /enzyme|rohapect/i.test(i.description) || /s87/i.test(i.itemNo || ''));
 
     const rows = [];
 
-    // Header
-    rows.push([null, `${productName} Fruit Batch Sheet`, null, null, null, numBatches, 'Batches of Fruit']);
-    rows.push([]);
-    rows.push([null, 'Lot #:']);
-    rows.push([null, 'Puree Maker:']);
-    rows.push([null, 'BATCH #', null, '#', null, '#', ...batchCols]);
-    rows.push([null, 'KETTLE #', null, 'UNITS', null, 'LBS']);
+    // Row 1: product title in A
+    rows.push([productName + ' Fruit Batch Sheet']);
+    // Row 2: batch count in E, label in F
+    rows.push(['', '', '', '', numBatches, 'Batches']);
+    // Rows 3-5: Date, Lot #, Puree Maker (all in A)
+    rows.push(['Date:']);
+    rows.push(['Lot #:']);
+    rows.push(['Puree Maker:']);
+    // Row 6: BATCH # header row — A='BATCH #', C='#', E='#', then 1 2 3... in F G H...
+    rows.push(['BATCH #', '', '#', '', '#', ...batchNums]);
+    // Row 7: column labels — A='KETTLE #', C='UNITS', E='LBS'
+    rows.push(['KETTLE #', '', 'UNITS', '', 'LBS']);
 
-    // Enzyme hold fields (if enzyme ingredient present)
-    const hasEnzyme = ings.some(i =>
-      i.description.toLowerCase().includes('enzyme') ||
-      i.description.toLowerCase().includes('rohapect') ||
-      i.description.toLowerCase().includes('s87') ||
-      (i.itemNo || '').toLowerCase().includes('s87'));
-
-    // Ingredients
-    let excelRow = 7; // 1-indexed, first ingredient row
-    const weightRows = [];
+    let excelRow = 8; // first ingredient starts here (1-indexed)
+    const firstIngRow = excelRow;
 
     for (const ing of ingData) {
+      // A=name, B='', C=containers or '', D=unit or '', E=lbs
       if (ing.containers !== null) {
-        rows.push([null, `${ing.itemNo} - ${ing.description}`, ing.containers, ing.containerUnit, +ing.lbsPerBatch.toFixed(2)]);
+        rows.push([`${ing.itemNo} - ${ing.description}`, '', ing.containers, ing.containerUnit, +ing.lbsPerBatch.toFixed(2)]);
       } else {
-        rows.push([null, `${ing.itemNo} - ${ing.description}`, null, null, +ing.lbsPerBatch.toFixed(2)]);
+        rows.push([`${ing.itemNo} - ${ing.description}`, '', '', '', +ing.lbsPerBatch.toFixed(2)]);
       }
-      weightRows.push(excelRow);
       excelRow++;
-
-      rows.push([null, 'Lot code:']);
+      rows.push(['Lot code:']);
       excelRow++;
     }
 
-    // Enzyme observation rows (only if enzyme ingredient present)
     if (hasEnzyme) {
-      rows.push([null, 'Temp of Puree (140F – 150F):']);
-      excelRow++;
-      rows.push([null, 'Enzyme Dosed, Time In:']);
-      excelRow++;
-      rows.push([null, '25 min hold, Time Complete:']);
-      excelRow++;
+      rows.push(['Temp of Puree (140°F – 150°F):']); excelRow++;
+      rows.push(['Enzyme Dosed, Time In:']);           excelRow++;
+      rows.push(['25 min hold, Time Complete:']);      excelRow++;
     }
 
-    rows.push([]);
+    // SUM spans from first ingredient row through last lot code row
+    // lot code rows are empty in E, so SUM naturally ignores them
+    const sumEnd = excelRow - 1;
+    rows.push(['TOTAL BATCH WEIGHT', '', '', '', `=SUM(E${firstIngRow}:E${sumEnd})`]);
     excelRow++;
-
-    // TOTAL BATCH WEIGHT — sum only weight rows (lot code rows have no E value)
-    const sumFormula = '=' + weightRows.map(r => `E${r}`).join('+');
-    rows.push([null, 'TOTAL BATCH WEIGHT:', null, null, sumFormula]);
+    rows.push(['TARGET BRIX:', targetBrix > 0 ? targetBrix : '']);
     excelRow++;
+    rows.push(['Target Brix range -2 to +2']);   excelRow++;
+    rows.push(['Add Antifoam (500g/batch)']);     excelRow++;
+    rows.push(['Lot code:']);                     excelRow++;
+    rows.push(['']);                              excelRow++;
 
-    rows.push([null, 'TARGET BRIX:', targetBrix > 0 ? targetBrix : '']);
-    excelRow++;
-
-    rows.push([null, 'Target Brix range −3 to +3']);
-    excelRow++;
-
-    rows.push([null, 'Add Antifoam (600g/batch)']);
-    excelRow++;
-
-    rows.push([null, 'Lot code:']);
-    excelRow++;
-
-    rows.push([]);
-    excelRow++;
-
-    // Process instructions
-    rows.push([null, 'Fruit:']);
-    excelRow++;
-
+    // Process steps — A=step#, B=text (matching template layout)
+    rows.push(['', 'Fruit:']);
     const steps = hasEnzyme ? [
       'Dump or pump drums of puree according to batch sheets into the Auger Tank. Pump into Heated Kettle.',
       'Add antifoam as indicated by batch sheet.',
@@ -23899,108 +23885,98 @@ const App = (() => {
       'Add the Sugar to the Hold Kettle according to batch sheets.',
       'Mix well and check Brix and pH before sending to ribbon blender.',
     ];
-
     steps.forEach((step, i) => rows.push([i + 1, step]));
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [
-      { wch: 6  }, // A
-      { wch: 46 }, // B
-      { wch: 8  }, // C
-      { wch: 8  }, // D
-      { wch: 12 }, // E — lbs
-      { wch: 8  }, // F
-      { wch: 8  }, // G
-      { wch: 8  }, // H
-      { wch: 8  }, // I
-      { wch: 8  }, // J
-      { wch: 8  }, // K
-      { wch: 8  }, // L
+      { wch: 48 }, // A — ingredient names / labels
+      { wch: 4  }, // B
+      { wch: 8  }, // C — unit count
+      { wch: 8  }, // D — unit type
+      { wch: 12 }, // E — LBS
+      { wch: 6  }, { wch: 6  }, { wch: 6  }, { wch: 6  }, // F G H I
+      { wch: 6  }, { wch: 6  },                            // J K
     ];
     return ws;
   }
 
   function _bs_slurryBatchSheet(productName, ings, numBatches, batchLbs, targetBrix) {
+    // Layout matches 'Slurry Batch Sheet FS' template:
+    //   A = step numbers only
+    //   B = ingredient name / labels / step descriptions
+    //   C = unit count (#)
+    //   D = unit type (Bags/Drums)
+    //   E = LBS per batch
+    //   F onwards = batch number columns (operators initial)
     const slurryPctTotal = ings.reduce((s, i) => s + i.pct, 0);
     const ingData = ings.map(ing => {
       const lbsPerBatch = slurryPctTotal > 0 ? (ing.pct / slurryPctTotal) * batchLbs : 0;
-      const containers  = (ing.containerSize > 0 && ing.containerUnit !== 'lbs')
+      const containers = (ing.containerSize > 0 && ing.containerUnit !== 'lbs')
         ? Math.ceil(lbsPerBatch / ing.containerSize) : null;
       return { ...ing, lbsPerBatch, containers };
     });
 
-    const batchCols = [];
-    for (let i = 1; i <= Math.min(numBatches, 7); i++) batchCols.push(i);
-
+    const batchNums = Array.from({ length: Math.min(numBatches, 7) }, (_, i) => i + 1);
     const rows = [];
 
-    rows.push([null, `${productName} Slurry Batch Sheet`, null, null, null, numBatches, 'Batches of Slurry']);
-    rows.push([]);
-    rows.push([null, 'Lot #:']);
-    rows.push([null, 'Slurry Maker:']);
-    rows.push([null, 'BATCH #', null, null, null, ...batchCols]);
-    rows.push([null, null, 'UNITS', null, 'LBS']);
+    // Row 1: B=title, F=batchCount, G='Batches of Slurry'
+    rows.push(['', productName + ' Slurry Batch Sheet', '', '', '', numBatches, 'Batches of Slurry']);
+    // Row 2-3: Lot #, Slurry Maker (B column)
+    rows.push(['', 'Lot #:']);
+    rows.push(['', 'Slurry Maker:']);
+    // Row 4: BATCH # header — B='BATCH #', then 1,2,3... starting at F
+    rows.push(['', 'BATCH #', '', '', '', ...batchNums]);
+    // Row 5: column labels — C='UNITS', E='LBS'
+    rows.push(['', '', 'UNITS', '', 'LBS']);
 
-    let excelRow = 7;
-    const weightRows = [];
+    let excelRow = 6; // first ingredient row (1-indexed)
+    const firstIngRow = excelRow;
 
     for (const ing of ingData) {
+      // B=name, C=containers or '', D=unit or '', E=lbs
       if (ing.containers !== null) {
-        rows.push([null, `${ing.itemNo} - ${ing.description}`, ing.containers, ing.containerUnit, +ing.lbsPerBatch.toFixed(2)]);
+        rows.push(['', `${ing.itemNo} - ${ing.description}`, ing.containers, ing.containerUnit, +ing.lbsPerBatch.toFixed(2)]);
       } else {
-        rows.push([null, `${ing.itemNo} - ${ing.description}`, null, null, +ing.lbsPerBatch.toFixed(2)]);
+        rows.push(['', `${ing.itemNo} - ${ing.description}`, '', '', +ing.lbsPerBatch.toFixed(2)]);
       }
-      weightRows.push(excelRow);
       excelRow++;
-
-      rows.push([null, 'Lot code:']);
+      rows.push(['', 'Lot code:']);
       excelRow++;
     }
 
-    rows.push([]);
+    // SUM spans first ingredient through last lot code row; lot code rows are empty in E
+    const sumEnd = excelRow - 1;
+    rows.push(['']);                              excelRow++;  // blank separator
+    rows.push(['', 'TOTAL BATCH WEIGHT:', '', '', `=SUM(E${firstIngRow}:E${sumEnd})`]);
     excelRow++;
-
-    const sumFormula = '=' + weightRows.map(r => `E${r}`).join('+');
-    rows.push([null, 'TOTAL BATCH WEIGHT:', null, null, sumFormula]);
+    rows.push(['', 'TARGET BRIX:', targetBrix > 0 ? targetBrix : '']);
     excelRow++;
+    rows.push(['', 'Target Brix range -3 to +3']);  excelRow++;
+    rows.push(['', 'Add Antifoam (500g/batch)']);    excelRow++;
+    rows.push(['', 'Lot code:']);                    excelRow++;
+    rows.push(['', 'Have QC check pH before pumping.']); excelRow++;
+    rows.push(['']);                                  excelRow++;
 
-    rows.push([null, 'TARGET BRIX:', targetBrix > 0 ? targetBrix : '']);
-    excelRow++;
-
-    rows.push([null, 'Target Brix range −3 to +3']);
-    excelRow++;
-
-    rows.push([null, 'Add Antifoam (500g/batch)']);
-    excelRow++;
-
-    rows.push([null, 'Lot code:']);
-    excelRow++;
-
-    rows.push([null, 'Have QC check pH before pumping.']);
-    excelRow++;
-
-    rows.push([]);
-    excelRow++;
-
-    rows.push([null, 'Slurry:']);
-    excelRow++;
-
-    // Auto-detect slurry instruction sequence
-    const hasGum    = ings.some(i => i.description.toLowerCase().includes('gum') || i.description.toLowerCase().includes('action gum'));
+    // Process steps — A=step#, B=description
+    rows.push(['', 'Slurry:']);
+    const hasGum    = ings.some(i => /gum|cytoguard/i.test(i.description));
     const hasJuice  = ings.some(i => /juice|lemon|lime|conc|beverage/i.test(i.description));
     const hasColor  = ings.some(i => /color|exberry|gnt|shade|vivid|scarlet|yellow|red/i.test(i.description));
+    const hasFlavor = ings.some(i => /flavor|flavour/i.test(i.description));
     const hasSyrup  = ings.some(i => /syrup/i.test(i.description));
 
     const steps = ['Add hot water to slurry kettle.'];
     if (hasGum) {
       steps.push('Mix Action Gum with some of the Sugar, mix thoroughly and set aside (according to SOP-309 Hydrocolloid Mixing Policy).');
-      steps.push('Add the remainder of the Sugar and Citric Acid to the Likwifier. Add Antifoam as indicated on batch sheets.');
+      steps.push('Add the remainder of the Sugar to the kettle. Add Antifoam as indicated on batch sheets.');
+      steps.push('Turn off the impeller. Keep only paddles on.');
       steps.push('Slowly add the dry ingredients mixture to the kettle.');
     } else {
       steps.push('Add the Sugar and Citric Acid to the Likwifier. Add Antifoam as indicated on batch sheets.');
     }
     if (hasJuice)  steps.push('Pump in juice concentrate(s).');
     if (hasSyrup)  steps.push('Add syrup ingredient(s).');
+    if (hasFlavor) steps.push('Add flavor(s).');
     if (hasColor)  steps.push('Add color(s). SET IMPELLER AND PADDLE SPEED TO SLOW.');
     steps.push('Mix well and check Brix and pH before sending to ribbon blender.');
 
@@ -24008,13 +23984,13 @@ const App = (() => {
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [
-      { wch: 6  },
-      { wch: 46 },
-      { wch: 8  },
-      { wch: 8  },
-      { wch: 12 },
-      { wch: 8  }, { wch: 8  }, { wch: 8  }, { wch: 8  },
-      { wch: 8  }, { wch: 8  }, { wch: 8  },
+      { wch: 6  }, // A — step numbers
+      { wch: 48 }, // B — content
+      { wch: 8  }, // C — unit count
+      { wch: 8  }, // D — unit type
+      { wch: 12 }, // E — LBS
+      { wch: 6  }, { wch: 6  }, { wch: 6  }, { wch: 6  }, // F G H I
+      { wch: 6  }, { wch: 6  }, { wch: 6  },              // J K L
     ];
     return ws;
   }
