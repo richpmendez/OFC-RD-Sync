@@ -20900,6 +20900,7 @@ html, body { height: 100%; }
       </div>
       <button class="btn btn-secondary btn-sm" id="btn-save-sp" onclick="App.saveToSharePoint()" title="Save current formula to SharePoint">💾 Save</button>
       <button class="btn btn-secondary btn-sm" id="btn-spec-sheet" onclick="App.openSpecSheetModal()" title="Generate customer spec sheet">Spec Sheet</button>
+      <button class="btn btn-secondary btn-sm" id="btn-batch-sheet" onclick="App.openBatchSheetModal()" title="Generate batch sheets (Phase 4)">Batch Sheets</button>
       <button class="btn btn-secondary btn-sm" onclick="App.openSettings()">⚙</button>
       <span class="user-chip" id="hdr-user"></span>
     </span>
@@ -21206,6 +21207,76 @@ html, body { height: 100%; }
     </div>
   </div>
 </div>
+
+<!-- ═══════════════════════════════════════════════ PHASE 4: BATCH SHEET GENERATOR -->
+<div id="modal-batchsheet" class="modal-overlay">
+  <div class="modal" style="max-width:700px; max-height:92vh; overflow-y:auto;">
+    <h2 style="font-size:15px; margin-bottom:4px;">Batch Sheet Generator</h2>
+    <p style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">
+      Generates Fruit &amp; Slurry batch sheets + a locked Approved Formula tab.
+    </p>
+    <div style="background:#fffbe6; border:1px solid #e6c200; border-radius:4px; padding:8px 12px; margin-bottom:14px; font-size:11px;">
+      <strong>Before generating:</strong> assign each ingredient to Fruit or Slurry, confirm container sizes, and set batch sizes below.
+    </div>
+
+    <!-- Run parameters -->
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+      <div class="form-group" style="margin:0;">
+        <label>Total Run Size (lbs)</label>
+        <input type="number" id="bs-total-size" value="10000" style="width:100%;">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Fruit Batch Size (lbs)</label>
+        <input type="number" id="bs-fruit-size" value="1800" style="width:100%;">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Slurry Batch Size (lbs)</label>
+        <input type="number" id="bs-slurry-size" value="1530" style="width:100%;">
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+      <div class="form-group" style="margin:0;">
+        <label>Fruit Batch Target Brix</label>
+        <input type="number" id="bs-fruit-brix" step="0.1" placeholder="e.g. 50.0" style="width:100%;">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Slurry Target Brix</label>
+        <input type="number" id="bs-slurry-brix" step="0.1" placeholder="e.g. 59.0" style="width:100%;">
+      </div>
+    </div>
+
+    <!-- Aseptic production planning section (live, separate from batch sheet) -->
+    <div id="bs-aseptic-section" style="display:none; margin-bottom:14px; background:#f8f0ff; border:1px solid #c9a0dc; border-radius:4px; padding:10px 12px;">
+      <div style="font-weight:600; font-size:12px; margin-bottom:6px;">
+        Aseptic Production Planning
+        <span style="font-weight:400; font-size:10px; color:var(--text-muted);">(extracted from batch sheet — lives here)</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:8px;">
+        <div class="form-group" style="margin:0;"><label>990 lb Drum (lbs)</label><input type="number" id="bs-drum-wt" value="990" style="width:100%;"></div>
+        <div class="form-group" style="margin:0;"><label># of 990 lb Drums</label><input type="number" id="bs-drum-ct" value="0" style="width:100%;"></div>
+        <div class="form-group" style="margin:0;"><label>Yield Factor</label><input type="number" id="bs-yield" value="0.968" step="0.001" style="width:100%;"></div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+        <div class="form-group" style="margin:0;"><label>40 lb Case (lbs)</label><input type="number" id="bs-case-wt" value="40" style="width:100%;"></div>
+        <div class="form-group" style="margin:0;"><label># of 40 lb Cases</label><input type="number" id="bs-case-ct" value="0" style="width:100%;"></div>
+        <div class="form-group" style="margin:0;"><label>Other (lbs)</label><input type="number" id="bs-other-lbs" value="0" style="width:100%;"></div>
+      </div>
+      <div style="margin-top:8px; font-size:11px; color:var(--text-muted);">
+        Lbs Needed = ((drum_lbs + case_lbs + other_lbs) / Yield). Included on a separate Planning tab.
+      </div>
+    </div>
+
+    <!-- Ingredient assignment table -->
+    <div style="font-weight:600; font-size:12px; margin-bottom:6px;">Ingredient Assignments</div>
+    <div id="bs-ing-table" style="margin-bottom:16px; overflow-x:auto;"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="App.closeModal('modal-batchsheet')">Cancel</button>
+      <button class="btn btn-primary" onclick="App.generateBatchSheets()">Generate Excel</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- ═══════════════════════════════════════════════ SCRIPT -->
 <script>
@@ -23514,8 +23585,489 @@ const App = (() => {
     }
   }
 
+/* ══════════════════════════════════════════════════════════════
+   PHASE 4 — BATCH SHEET GENERATOR
+   Generates Fruit + Slurry batch sheets + Approved Formula tab.
+   Aseptic production planning extracted to a separate Planning tab.
+   ══════════════════════════════════════════════════════════════ */
+
+  function openBatchSheetModal() {
+    if (!wb?.versions?.[selIdx]) { alert('Open a formula workbook first.'); return; }
+    const ver = wb.versions[selIdx];
+
+    // Auto-set target brix hints from formula Brix
+    const liveBrix = ver.ingredients.reduce((s, i) => s + i.pct * i.ingrBrix, 0);
+    el('bs-fruit-brix').value = '';
+    el('bs-slurry-brix').value = liveBrix.toFixed(1);
+
+    // Show aseptic planning section only for Aseptic Puree line
+    const isAseptic = (wb.productLine || '').toLowerCase().includes('aseptic');
+    el('bs-aseptic-section').style.display = isAseptic ? '' : 'none';
+
+    _renderBsIngTable(ver);
+    openModal('modal-batchsheet');
+  }
+
+  function _renderBsIngTable(ver) {
+    const rows = ver.ingredients.map((ing, i) => {
+      // Default side heuristics
+      const desc = ing.description.toLowerCase();
+      const item = (ing.itemNo || '').toLowerCase();
+      const isPuree  = desc.includes('puree') || desc.includes('cherry') || desc.includes('berry') || desc.includes('apple') || desc.includes('peach') || desc.includes('mango') || desc.includes('pineapple');
+      const isEnzyme = desc.includes('enzyme') || desc.includes('rohapect') || item.includes('s87');
+      const isSugarFruit = isPuree; // sugar on fruit side is common
+
+      let defaultSide = 'Slurry';
+      if (isPuree || isEnzyme) defaultSide = 'Fruit';
+      // First sugar row tends to be fruit side for enzyme products
+      const sugarCount = ver.ingredients.slice(0, i).filter(x => x.description.toLowerCase().includes('sugar')).length;
+      if (desc.includes('sugar') && sugarCount === 0 && isPuree) defaultSide = 'Fruit';
+
+      // Container size heuristics
+      let cSize = 0, cUnit = 'lbs';
+      if (isPuree) { cSize = 400; cUnit = 'drums'; }
+      else if (desc.includes('sugar')) { cSize = 50; cUnit = 'bags'; }
+      else if (desc.includes('lemon') || desc.includes('lime') || desc.includes('conc')) { cSize = 485; cUnit = 'drums'; }
+
+      return `
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:4px 6px; font-size:11px; font-family:monospace; white-space:nowrap;">${_escHtml(ing.itemNo)}</td>
+          <td style="padding:4px 6px; font-size:11px;">${_escHtml(ing.description)}</td>
+          <td style="padding:4px 6px; font-size:11px; text-align:right; color:var(--text-muted);">${(ing.pct*100).toFixed(2)}%</td>
+          <td style="padding:4px 6px;">
+            <select id="bs-side-${i}" style="font-size:11px; padding:2px 4px; border:1px solid var(--border); border-radius:3px;">
+              <option value="Fruit"${defaultSide==='Fruit'?' selected':''}>Fruit</option>
+              <option value="Slurry"${defaultSide==='Slurry'?' selected':''}>Slurry</option>
+              <option value="Skip">Skip</option>
+            </select>
+          </td>
+          <td style="padding:4px 6px;">
+            <div style="display:flex; gap:4px; align-items:center;">
+              <input type="number" id="bs-csize-${i}" value="${cSize}" style="width:60px; font-size:11px; padding:2px 4px; border:1px solid var(--border); border-radius:3px;">
+              <select id="bs-cunit-${i}" style="font-size:11px; padding:2px 4px; border:1px solid var(--border); border-radius:3px;">
+                <option value="drums"${cUnit==='drums'?' selected':''}>drums</option>
+                <option value="bags"${cUnit==='bags'?' selected':''}>bags</option>
+                <option value="lbs"${cUnit==='lbs'?' selected':''}>lbs</option>
+              </select>
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+
+    el('bs-ing-table').innerHTML = `
+      <table style="width:100%; border-collapse:collapse; border:1px solid var(--border); border-radius:4px; overflow:hidden;">
+        <thead>
+          <tr style="background:var(--bg-light,#f7f7f5); font-size:10px; color:var(--text-muted);">
+            <th style="padding:5px 6px; text-align:left;">Item #</th>
+            <th style="padding:5px 6px; text-align:left;">Ingredient</th>
+            <th style="padding:5px 6px; text-align:right;">%</th>
+            <th style="padding:5px 6px; text-align:left;">Side</th>
+            <th style="padding:5px 6px; text-align:left;">Container</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  function generateBatchSheets() {
+    if (!wb?.versions?.[selIdx]) return;
+    const ver = wb.versions[selIdx];
+
+    const totalRunLbs    = parseFloat(el('bs-total-size').value)  || 10000;
+    const fruitBatchLbs  = parseFloat(el('bs-fruit-size').value)  || 1800;
+    const slurryBatchLbs = parseFloat(el('bs-slurry-size').value) || 1530;
+    const fruitTargetBrix  = parseFloat(el('bs-fruit-brix').value)  || 0;
+    const slurryTargetBrix = parseFloat(el('bs-slurry-brix').value) || 0;
+
+    // Collect ingredient assignments
+    const ings = ver.ingredients.map((ing, i) => ({
+      ...ing,
+      side:          el('bs-side-'  + i)?.value || 'Slurry',
+      containerSize: parseFloat(el('bs-csize-' + i)?.value) || 0,
+      containerUnit: el('bs-cunit-' + i)?.value || 'lbs',
+    })).filter(i => i.side !== 'Skip');
+
+    const fruitIngs  = ings.filter(i => i.side === 'Fruit');
+    const slurryIngs = ings.filter(i => i.side === 'Slurry');
+
+    const fruitPctSum  = fruitIngs.reduce((s, i) => s + i.pct, 0);
+    const slurryPctSum = slurryIngs.reduce((s, i) => s + i.pct, 0);
+
+    // Total component lbs in the run
+    const fruitRunLbs  = totalRunLbs * fruitPctSum;
+    const slurryRunLbs = totalRunLbs * slurryPctSum;
+
+    const fruitBatches  = fruitPctSum  > 0 ? Math.ceil(fruitRunLbs  / fruitBatchLbs)  : 0;
+    const slurryBatches = slurryPctSum > 0 ? Math.ceil(slurryRunLbs / slurryBatchLbs) : 0;
+
+    const xlWb = XLSX.utils.book_new();
+
+    // Tab 1: Approved Formula (locked)
+    const approvedSheet = _bs_approvedFormulaSheet(ver, ings);
+    XLSX.utils.book_append_sheet(xlWb, approvedSheet, 'Approved Formula');
+
+    // Tab 2: Fruit Batch Sheet
+    if (fruitBatches > 0 && fruitIngs.length > 0) {
+      const fruitSheet = _bs_fruitBatchSheet(wb.productName, fruitIngs, fruitBatches, fruitBatchLbs, fruitTargetBrix);
+      XLSX.utils.book_append_sheet(xlWb, fruitSheet, 'Fruit Batch Sheet');
+    }
+
+    // Tab 3: Slurry Batch Sheet
+    if (slurryBatches > 0 && slurryIngs.length > 0) {
+      const slurrySheet = _bs_slurryBatchSheet(wb.productName, slurryIngs, slurryBatches, slurryBatchLbs, slurryTargetBrix);
+      XLSX.utils.book_append_sheet(xlWb, slurrySheet, 'Slurry Batch Sheet');
+    }
+
+    // Tab 4: Aseptic Planning (if applicable)
+    const isAseptic = (wb.productLine || '').toLowerCase().includes('aseptic');
+    if (isAseptic) {
+      const planSheet = _bs_asepticPlanningSheet(wb.productName, ver, ings);
+      XLSX.utils.book_append_sheet(xlWb, planSheet, 'Production Planning');
+    }
+
+    // Download
+    const slug = (wb.productName || 'product').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    XLSX.writeFile(xlWb, slug + '-batch-sheets.xlsx');
+    closeModal('modal-batchsheet');
+  }
+
+  /* ── Sheet builders ─────────────────────────────────────────── */
+
+  function _bs_approvedFormulaSheet(ver, ings) {
+    const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const rows = [
+      ['APPROVED MASTER FORMULA — LOCKED. DO NOT EDIT.'],
+      [],
+      ['Product Name:',    wb.productName || ''],
+      ['Item Number(s):',  ''],
+      ['Product Line:',    wb.productLine || ''],
+      ['Version:',         ver.label],
+      ['Status:',          ver.status],
+      ['Approved Date:',   now],
+      ['Approved By:',     ''],
+      [],
+      ['SECTION 1 — OFFICIAL FORMULATION'],
+      ['Item #', 'Ingredient', '', 'Formula %', 'Ingr. Brix', 'Formula Brix', 'Side'],
+    ];
+
+    const ingStartRow = rows.length + 1; // 1-indexed Excel row of first ingredient
+
+    for (const ing of ings) {
+      rows.push([
+        ing.itemNo,
+        ing.description,
+        '',
+        +(ing.pct.toFixed(6)),
+        +(ing.ingrBrix),
+        +(ing.pct * ing.ingrBrix).toFixed(4),
+        ing.side,
+      ]);
+    }
+
+    const ingEndRow = rows.length; // last ingredient row (1-indexed)
+
+    rows.push([]);
+    rows.push(['', 'TOTAL', '', `=SUM(D${ingStartRow}:D${ingEndRow})`, '', `=SUM(F${ingStartRow}:F${ingEndRow})`, '← formula Brix']);
+    rows.push([]);
+    rows.push(['SECTION 2 — BENCH METRICS']);
+    rows.push(['Formula Brix:', `=F${ingEndRow + 2}`]);
+    rows.push(['Tested Brix:',  ver.testedBrix != null ? ver.testedBrix : '—']);
+    rows.push(['Tested pH:',    ver.testedPh   != null ? ver.testedPh   : '—']);
+    rows.push(['Tested Visc.:', ver.testedVisc != null ? ver.testedVisc : '—']);
+    rows.push([]);
+    rows.push(['SECTION 3 — CHANGE LOG']);
+    rows.push(['Version', 'Date', 'Changed By', 'Description of Change']);
+    rows.push([ver.label, now, '', 'Formula approved.']);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    ws['!cols'] = [
+      { wch: 14 }, // A
+      { wch: 34 }, // B
+      { wch: 4  }, // C
+      { wch: 12 }, // D — Formula %
+      { wch: 12 }, // E — Ingr. Brix
+      { wch: 14 }, // F — Formula Brix
+      { wch: 10 }, // G — Side
+    ];
+
+    // Mark sheet as protected (Excel respects this as a lock signal)
+    ws['!protect'] = { sheet: true, selectLockedCells: true, selectUnlockedCells: false };
+
+    return ws;
+  }
+
+  function _bs_fruitBatchSheet(productName, ings, numBatches, batchLbs, targetBrix) {
+    const fruitPctTotal = ings.reduce((s, i) => s + i.pct, 0);
+    const ingData = ings.map(ing => {
+      const lbsPerBatch = fruitPctTotal > 0 ? (ing.pct / fruitPctTotal) * batchLbs : 0;
+      const containers  = (ing.containerSize > 0 && ing.containerUnit !== 'lbs')
+        ? Math.ceil(lbsPerBatch / ing.containerSize) : null;
+      return { ...ing, lbsPerBatch, containers };
+    });
+
+    const batchCols = [];
+    for (let i = 1; i <= Math.min(numBatches, 7); i++) batchCols.push(i);
+
+    const rows = [];
+
+    // Header
+    rows.push([null, `${productName} Fruit Batch Sheet`, null, null, null, numBatches, 'Batches of Fruit']);
+    rows.push([]);
+    rows.push([null, 'Lot #:']);
+    rows.push([null, 'Puree Maker:']);
+    rows.push([null, 'BATCH #', null, '#', null, '#', ...batchCols]);
+    rows.push([null, 'KETTLE #', null, 'UNITS', null, 'LBS']);
+
+    // Enzyme hold fields (if enzyme ingredient present)
+    const hasEnzyme = ings.some(i =>
+      i.description.toLowerCase().includes('enzyme') ||
+      i.description.toLowerCase().includes('rohapect') ||
+      i.description.toLowerCase().includes('s87') ||
+      (i.itemNo || '').toLowerCase().includes('s87'));
+
+    // Ingredients
+    let excelRow = 7; // 1-indexed, first ingredient row
+    const weightRows = [];
+
+    for (const ing of ingData) {
+      if (ing.containers !== null) {
+        rows.push([null, `${ing.itemNo} - ${ing.description}`, ing.containers, ing.containerUnit, +ing.lbsPerBatch.toFixed(2)]);
+      } else {
+        rows.push([null, `${ing.itemNo} - ${ing.description}`, null, null, +ing.lbsPerBatch.toFixed(2)]);
+      }
+      weightRows.push(excelRow);
+      excelRow++;
+
+      rows.push([null, 'Lot code:']);
+      excelRow++;
+    }
+
+    // Enzyme observation rows (only if enzyme ingredient present)
+    if (hasEnzyme) {
+      rows.push([null, 'Temp of Puree (140F – 150F):']);
+      excelRow++;
+      rows.push([null, 'Enzyme Dosed, Time In:']);
+      excelRow++;
+      rows.push([null, '25 min hold, Time Complete:']);
+      excelRow++;
+    }
+
+    rows.push([]);
+    excelRow++;
+
+    // TOTAL BATCH WEIGHT — sum only weight rows (lot code rows have no E value)
+    const sumFormula = '=' + weightRows.map(r => `E${r}`).join('+');
+    rows.push([null, 'TOTAL BATCH WEIGHT:', null, null, sumFormula]);
+    excelRow++;
+
+    rows.push([null, 'TARGET BRIX:', targetBrix > 0 ? targetBrix : '']);
+    excelRow++;
+
+    rows.push([null, 'Target Brix range −3 to +3']);
+    excelRow++;
+
+    rows.push([null, 'Add Antifoam (600g/batch)']);
+    excelRow++;
+
+    rows.push([null, 'Lot code:']);
+    excelRow++;
+
+    rows.push([]);
+    excelRow++;
+
+    // Process instructions
+    rows.push([null, 'Fruit:']);
+    excelRow++;
+
+    const steps = hasEnzyme ? [
+      'Dump or pump drums of puree according to batch sheets into the Auger Tank. Pump into Heated Kettle.',
+      'Add antifoam as indicated by batch sheet.',
+      'Heat fruit to a minimum temperature of 140°F – 150°F.',
+      'Verify temperature by handheld thermal probe in center of kettle. Record temperature on batch sheet.',
+      'Add enzymes into first puree kettle when kettle is halfway full of puree.',
+      'Begin 25 minute hold time.',
+      'Transfer puree through Brown Finisher to Hold Kettle once hold time is over.',
+      'Add the Sugar to the Hold Kettle according to batch sheets.',
+      'Mix well and check Brix and pH before sending to ribbon blender.',
+    ] : [
+      'Dump or pump drums of puree according to batch sheets into the Auger Tank. Pump into Heated Kettle.',
+      'Add antifoam as indicated by batch sheet.',
+      'Heat fruit to a minimum temperature of 140°F – 150°F.',
+      'Verify temperature by handheld thermal probe in center of kettle.',
+      'Transfer puree to Hold Kettle.',
+      'Add the Sugar to the Hold Kettle according to batch sheets.',
+      'Mix well and check Brix and pH before sending to ribbon blender.',
+    ];
+
+    steps.forEach((step, i) => rows.push([i + 1, step]));
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 6  }, // A
+      { wch: 46 }, // B
+      { wch: 8  }, // C
+      { wch: 8  }, // D
+      { wch: 12 }, // E — lbs
+      { wch: 8  }, // F
+      { wch: 8  }, // G
+      { wch: 8  }, // H
+      { wch: 8  }, // I
+      { wch: 8  }, // J
+      { wch: 8  }, // K
+      { wch: 8  }, // L
+    ];
+    return ws;
+  }
+
+  function _bs_slurryBatchSheet(productName, ings, numBatches, batchLbs, targetBrix) {
+    const slurryPctTotal = ings.reduce((s, i) => s + i.pct, 0);
+    const ingData = ings.map(ing => {
+      const lbsPerBatch = slurryPctTotal > 0 ? (ing.pct / slurryPctTotal) * batchLbs : 0;
+      const containers  = (ing.containerSize > 0 && ing.containerUnit !== 'lbs')
+        ? Math.ceil(lbsPerBatch / ing.containerSize) : null;
+      return { ...ing, lbsPerBatch, containers };
+    });
+
+    const batchCols = [];
+    for (let i = 1; i <= Math.min(numBatches, 7); i++) batchCols.push(i);
+
+    const rows = [];
+
+    rows.push([null, `${productName} Slurry Batch Sheet`, null, null, null, numBatches, 'Batches of Slurry']);
+    rows.push([]);
+    rows.push([null, 'Lot #:']);
+    rows.push([null, 'Slurry Maker:']);
+    rows.push([null, 'BATCH #', null, null, null, ...batchCols]);
+    rows.push([null, null, 'UNITS', null, 'LBS']);
+
+    let excelRow = 7;
+    const weightRows = [];
+
+    for (const ing of ingData) {
+      if (ing.containers !== null) {
+        rows.push([null, `${ing.itemNo} - ${ing.description}`, ing.containers, ing.containerUnit, +ing.lbsPerBatch.toFixed(2)]);
+      } else {
+        rows.push([null, `${ing.itemNo} - ${ing.description}`, null, null, +ing.lbsPerBatch.toFixed(2)]);
+      }
+      weightRows.push(excelRow);
+      excelRow++;
+
+      rows.push([null, 'Lot code:']);
+      excelRow++;
+    }
+
+    rows.push([]);
+    excelRow++;
+
+    const sumFormula = '=' + weightRows.map(r => `E${r}`).join('+');
+    rows.push([null, 'TOTAL BATCH WEIGHT:', null, null, sumFormula]);
+    excelRow++;
+
+    rows.push([null, 'TARGET BRIX:', targetBrix > 0 ? targetBrix : '']);
+    excelRow++;
+
+    rows.push([null, 'Target Brix range −3 to +3']);
+    excelRow++;
+
+    rows.push([null, 'Add Antifoam (500g/batch)']);
+    excelRow++;
+
+    rows.push([null, 'Lot code:']);
+    excelRow++;
+
+    rows.push([null, 'Have QC check pH before pumping.']);
+    excelRow++;
+
+    rows.push([]);
+    excelRow++;
+
+    rows.push([null, 'Slurry:']);
+    excelRow++;
+
+    // Auto-detect slurry instruction sequence
+    const hasGum    = ings.some(i => i.description.toLowerCase().includes('gum') || i.description.toLowerCase().includes('action gum'));
+    const hasJuice  = ings.some(i => /juice|lemon|lime|conc|beverage/i.test(i.description));
+    const hasColor  = ings.some(i => /color|exberry|gnt|shade|vivid|scarlet|yellow|red/i.test(i.description));
+    const hasSyrup  = ings.some(i => /syrup/i.test(i.description));
+
+    const steps = ['Add hot water to slurry kettle.'];
+    if (hasGum) {
+      steps.push('Mix Action Gum with some of the Sugar, mix thoroughly and set aside (according to SOP-309 Hydrocolloid Mixing Policy).');
+      steps.push('Add the remainder of the Sugar and Citric Acid to the Likwifier. Add Antifoam as indicated on batch sheets.');
+      steps.push('Slowly add the dry ingredients mixture to the kettle.');
+    } else {
+      steps.push('Add the Sugar and Citric Acid to the Likwifier. Add Antifoam as indicated on batch sheets.');
+    }
+    if (hasJuice)  steps.push('Pump in juice concentrate(s).');
+    if (hasSyrup)  steps.push('Add syrup ingredient(s).');
+    if (hasColor)  steps.push('Add color(s). SET IMPELLER AND PADDLE SPEED TO SLOW.');
+    steps.push('Mix well and check Brix and pH before sending to ribbon blender.');
+
+    steps.forEach((step, i) => rows.push([i + 1, step]));
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 6  },
+      { wch: 46 },
+      { wch: 8  },
+      { wch: 8  },
+      { wch: 12 },
+      { wch: 8  }, { wch: 8  }, { wch: 8  }, { wch: 8  },
+      { wch: 8  }, { wch: 8  }, { wch: 8  },
+    ];
+    return ws;
+  }
+
+  function _bs_asepticPlanningSheet(productName, ver, ings) {
+    // Aseptic: the yellow production planning table lives HERE, not on the batch sheet.
+    const drumWt   = parseFloat(el('bs-drum-wt')?.value)  || 990;
+    const drumCt   = parseFloat(el('bs-drum-ct')?.value)  || 0;
+    const caseWt   = parseFloat(el('bs-case-wt')?.value)  || 40;
+    const caseCt   = parseFloat(el('bs-case-ct')?.value)  || 0;
+    const otherLbs = parseFloat(el('bs-other-lbs')?.value)|| 0;
+    const yieldFac = parseFloat(el('bs-yield')?.value)    || 0.968;
+
+    const rows = [
+      [`${productName} — Aseptic Production Planning`],
+      [],
+      ['Container Type', 'Weight (lbs)', 'Count', 'Total (lbs)'],
+      [drumWt + ' lb Drums', drumWt, drumCt, `=B4*C4`],
+      [caseWt  + ' lb Cases', caseWt, caseCt, `=B5*C5`],
+      ['Other', otherLbs, 1, `=B6*C6`],
+      [],
+      ['Yield Factor:', yieldFac],
+      ['Lbs Needed:', `=(D4+D5+D6)/B9`],
+      [],
+      ['Per-Ingredient Drum / Tote Planning'],
+      ['Item #', 'Ingredient', 'Batch Lbs', 'Container Size (lbs)', 'Containers Needed'],
+    ];
+
+    for (const ing of ings) {
+      const batchLbs = ing.pct * parseFloat(el('bs-total-size')?.value || 10000);
+      rows.push([
+        ing.itemNo,
+        ing.description,
+        +batchLbs.toFixed(2),
+        ing.containerSize || '',
+        ing.containerSize > 0 ? `=ROUNDUP(C${rows.length + 1}/D${rows.length + 1},0)` : 'N/A',
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 20 },
+      { wch: 34 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 18 },
+    ];
+    return ws;
+  }
+
+
   // Boot — init() handles screen routing; _initMsal handles MSAL auto-resume
-  init();
+  init()
 
   /* ── Public API ─────────────────────────────────────── */
   return {
@@ -23534,6 +24086,7 @@ const App = (() => {
     toggleSpDropdown, spNavigateUp,
     openNewFormulaModal, onNewFormulaCustomerChange, confirmNewFormula,
     openSpecSheetModal, showSpecSheetSummary, finalizeSpecSheet, backToSpecSheet,
+    openBatchSheetModal, generateBatchSheets,
     fillDescriptionDefault, toggleLineHelp,
     confirmGenerateSpecSheet,
     saveToSharePoint,
