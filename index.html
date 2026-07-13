@@ -20988,6 +20988,10 @@ html, body { height: 100%; }
     <div class="form-group"><label>Azure Client ID</label><input type="text" id="s-clientId"></div>
     <div class="form-group"><label>Tenant</label><input type="text" id="s-tenantId"></div>
     <div class="form-group"><label>Asana PAT</label><input type="password" id="s-asanaPAT"></div>
+    <hr style="margin:14px 0; border-color:var(--border);">
+    <p style="font-size:11px; font-weight:600; margin-bottom:6px;">Batch Sheet Templates (SharePoint paths relative to drive root)</p>
+    <div class="form-group"><label>Slurry Batch Sheet Template</label><input type="text" id="s-bsSlurryTpl" placeholder="e.g. R&D/Batch Templates/Slurry Template.xlsx"></div>
+    <div class="form-group"><label>Fruit Batch Sheet Template</label><input type="text" id="s-bsFruitTpl" placeholder="e.g. R&D/Batch Templates/Fruit Template.xlsx"></div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="App.closeModal('modal-settings')">Cancel</button>
       <button class="btn btn-primary" onclick="App.saveSettings()">Save</button>
@@ -21349,9 +21353,11 @@ const RecentWBs = {
 const App = (() => {
   /* ── State ───────────────────────────────────────────── */
   let cfg = {
-    clientId: LS.get('clientId'),
-    tenantId: LS.get('tenantId') || 'oregonfruitproducts.onmicrosoft.com',
-    asanaPAT: LS.get('asanaPAT')
+    clientId:      LS.get('clientId'),
+    tenantId:      LS.get('tenantId') || 'oregonfruitproducts.onmicrosoft.com',
+    asanaPAT:      LS.get('asanaPAT'),
+    bsSlurryTpl:   LS.get('bsSlurryTpl') || '',
+    bsFruitTpl:    LS.get('bsFruitTpl')  || '',
   };
   let msalApp    = null;
   let account    = null;
@@ -21417,10 +21423,12 @@ const App = (() => {
     showScreen('login');
   }
 
-  function _saveConfig(clientId, tenantId, pat) {
-    cfg.clientId = clientId; LS.set('clientId', clientId);
-    cfg.tenantId = tenantId; LS.set('tenantId', tenantId);
-    cfg.asanaPAT = pat;      LS.set('asanaPAT', pat);
+  function _saveConfig(clientId, tenantId, pat, bsSlurryTpl, bsFruitTpl) {
+    cfg.clientId    = clientId;    LS.set('clientId',    clientId);
+    cfg.tenantId    = tenantId;    LS.set('tenantId',    tenantId);
+    cfg.asanaPAT    = pat;         LS.set('asanaPAT',    pat);
+    cfg.bsSlurryTpl = bsSlurryTpl; LS.set('bsSlurryTpl', bsSlurryTpl);
+    cfg.bsFruitTpl  = bsFruitTpl;  LS.set('bsFruitTpl',  bsFruitTpl);
   }
 
   /* ── MSAL ────────────────────────────────────────────── */
@@ -21530,14 +21538,16 @@ const App = (() => {
 
   /* ── Settings ────────────────────────────────────────── */
   function openSettings() {
-    el('s-clientId').value = cfg.clientId;
-    el('s-tenantId').value = cfg.tenantId;
-    el('s-asanaPAT').value = cfg.asanaPAT;
+    el('s-clientId').value    = cfg.clientId    || '';
+    el('s-tenantId').value    = cfg.tenantId    || '';
+    el('s-asanaPAT').value    = cfg.asanaPAT    || '';
+    el('s-bsSlurryTpl').value = cfg.bsSlurryTpl || '';
+    el('s-bsFruitTpl').value  = cfg.bsFruitTpl  || '';
     openModal('modal-settings');
   }
 
   function saveSettings() {
-    _saveConfig(v('s-clientId'), v('s-tenantId'), v('s-asanaPAT'));
+    _saveConfig(v('s-clientId'), v('s-tenantId'), v('s-asanaPAT'), v('s-bsSlurryTpl'), v('s-bsFruitTpl'));
     try { if (cfg.clientId) _initMSAL(); } catch(e) { console.warn('MSAL init:', e); }
     closeModal('modal-settings');
   }
@@ -23669,7 +23679,114 @@ const App = (() => {
       </table>`;
   }
 
-  function generateBatchSheets() {
+  /* ── Template fetching ────────────────────────────────────────────────── */
+
+  async function _fetchSpTemplate(spPath) {
+    if (!spPath) throw new Error('No template path configured in Settings.');
+    if (!account) throw new Error('Sign in with Microsoft first.');
+    const res = await _graphFetch(
+      `/sites/${SP_SITE_ID}/drives/${SP_DRIVE_ID}/root:/${_encPath(spPath)}:/content`
+    );
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
+  /* ── Template analysis: detect ingredient slots and key cells ──────────
+     Scans for cells with external workbook ref formulas (contain "'[").
+     nameCol:  0=A (fruit), 1=B (slurry)
+     Returns { nameSlots[], batchCountCell, targetBrixCell, allExtCells[] } */
+  function _analyzeTemplate(ws, nameCol) {
+    if (!ws['!ref']) return { nameSlots: [], allExtCells: [] };
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const nameSlots   = [];  // { r, c, addr } — external refs in name column
+    const allExtCells = [];  // all external ref cells
+
+    const isExtRef = f => f && /'\[/.test(f);
+
+    for (let r = range.s.r; r <= range.e.r; r++) {
+      for (let c = range.s.c; c <= range.e.c; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        const cell = ws[addr];
+        if (!cell || !isExtRef(cell.f)) continue;
+        allExtCells.push({ r, c, addr, formula: cell.f });
+        if (c === nameCol) nameSlots.push({ r, c, addr });
+      }
+    }
+
+    // Batch count: external ref NOT in a nameSlot row, appearing in first 3 rows
+    const nameRows = new Set(nameSlots.map(s => s.r));
+    const nonIng   = allExtCells.filter(x => !nameRows.has(x.r));
+    const batchCountCell  = nonIng.find(x => x.r <= 2) || null;
+
+    // Target brix: external ref after all ingredient slots (largest row among non-ing refs)
+    const lastIngRow = nameSlots.length ? Math.max(...nameSlots.map(s => s.r)) : -1;
+    const postIng    = nonIng.filter(x => x.r > lastIngRow);
+    const targetBrixCell  = postIng.length ? postIng.reduce((a, b) => b.r < a.r ? b : a) : null;
+
+    return { nameSlots, batchCountCell, targetBrixCell, allExtCells };
+  }
+
+  /* ── Set a cell value, preserving existing style ───────────────────── */
+  function _setCell(ws, r, c, v, type) {
+    const addr = XLSX.utils.encode_cell({ r, c });
+    const existing = ws[addr] || {};
+    const t = type || (typeof v === 'number' ? 'n' : 's');
+    ws[addr] = { ...existing, f: undefined, v, t };
+  }
+
+  /* ── Fill one template sheet with formula data ─────────────────────────
+     nameCol: 0=A (fruit), 1=B (slurry)
+     lbsCol always E (4), countCol always C (2)                          */
+  function _fillTemplateSheet(ws, nameCol, ings, numBatches, batchLbs, targetBrix, productName, sheetLabel) {
+    const lbsCol = 4, countCol = 2;
+    const totalPct = ings.reduce((s, i) => s + i.pct, 0);
+
+    const { nameSlots, batchCountCell, targetBrixCell, allExtCells } = _analyzeTemplate(ws, nameCol);
+
+    // 1. Clear ALL external ref cells — strip linked formulas
+    for (const { addr, c } of allExtCells) {
+      const existing = ws[addr] || {};
+      ws[addr] = { ...existing, f: undefined, v: '', t: 's' };
+    }
+
+    // 2. Product name  (nameCol, row 0)
+    _setCell(ws, 0, nameCol, `${productName} ${sheetLabel}`);
+
+    // 3. Batch count
+    if (batchCountCell) _setCell(ws, batchCountCell.r, batchCountCell.c, numBatches, 'n');
+
+    // 4. Target Brix
+    if (targetBrixCell && targetBrix > 0) _setCell(ws, targetBrixCell.r, targetBrixCell.c, targetBrix, 'n');
+
+    // 5. Warn if more ingredients than template slots
+    if (ings.length > nameSlots.length) {
+      console.warn(`[Batch Sheet] Template has ${nameSlots.length} ingredient slots but formula has ${ings.length}. Extra ingredients will be skipped.`);
+    }
+
+    // 6. Fill ingredient slots
+    for (let i = 0; i < nameSlots.length; i++) {
+      const slot = nameSlots[i];
+      const ing  = ings[i];
+      if (!ing) {
+        // Clear slot (already cleared above, but ensure 0 in lbs so SUM still works)
+        _setCell(ws, slot.r, lbsCol, 0, 'n');
+        continue;
+      }
+      const lbsPerBatch = totalPct > 0 ? (ing.pct / totalPct) * batchLbs : 0;
+      const containers  = (ing.containerSize > 0 && ing.containerUnit !== 'lbs')
+        ? Math.ceil(lbsPerBatch / ing.containerSize) : null;
+
+      _setCell(ws, slot.r, nameCol, `${ing.itemNo} - ${ing.description}`);
+      _setCell(ws, slot.r, lbsCol, +lbsPerBatch.toFixed(2), 'n');
+      if (containers !== null) {
+        _setCell(ws, slot.r, countCol, containers, 'n');
+      }
+    }
+
+    return ws;
+  }
+
+  /* ── Main batch sheet generator ─────────────────────────────────────── */
+  async function generateBatchSheets() {
     if (!wb?.versions?.[selIdx]) return;
     const ver = wb.versions[selIdx];
 
@@ -23679,7 +23796,6 @@ const App = (() => {
     const fruitTargetBrix  = parseFloat(el('bs-fruit-brix').value)  || 0;
     const slurryTargetBrix = parseFloat(el('bs-slurry-brix').value) || 0;
 
-    // Collect ingredient assignments
     const ings = ver.ingredients.map((ing, i) => ({
       ...ing,
       side:          el('bs-side-'  + i)?.value || 'Slurry',
@@ -23693,7 +23809,6 @@ const App = (() => {
     const fruitPctSum  = fruitIngs.reduce((s, i) => s + i.pct, 0);
     const slurryPctSum = slurryIngs.reduce((s, i) => s + i.pct, 0);
 
-    // Total component lbs in the run
     const fruitRunLbs  = totalRunLbs * fruitPctSum;
     const slurryRunLbs = totalRunLbs * slurryPctSum;
 
@@ -23702,36 +23817,53 @@ const App = (() => {
 
     const xlWb = XLSX.utils.book_new();
 
-    // Tab 1: Approved Formula (locked)
-    const approvedSheet = _bs_approvedFormulaSheet(ver, ings);
-    XLSX.utils.book_append_sheet(xlWb, approvedSheet, 'Approved Formula');
+    // Tab 1: Approved Formula (built from scratch — no template needed)
+    XLSX.utils.book_append_sheet(xlWb, _bs_approvedFormulaSheet(ver, ings), 'Approved Formula');
 
-    // Tab 2: Fruit Batch Sheet
+    // Tab 2: Fruit Batch Sheet — load template from SharePoint and fill
     if (fruitBatches > 0 && fruitIngs.length > 0) {
-      const fruitSheet = _bs_fruitBatchSheet(wb.productName, fruitIngs, fruitBatches, fruitBatchLbs, fruitTargetBrix);
-      XLSX.utils.book_append_sheet(xlWb, fruitSheet, 'Fruit Batch Sheet');
+      if (!cfg.bsFruitTpl) {
+        alert('No Fruit Batch Sheet template path set — add it in ⚙ Settings.');
+      } else {
+        try {
+          const buf      = await _fetchSpTemplate(cfg.bsFruitTpl);
+          const tmplWb   = XLSX.read(buf, { type: 'array' });
+          const tmplWs   = tmplWb.Sheets[tmplWb.SheetNames[0]];
+          const filled   = _fillTemplateSheet(tmplWs, 0, fruitIngs, fruitBatches, fruitBatchLbs, fruitTargetBrix, wb.productName || '', 'Fruit Batch Sheet');
+          XLSX.utils.book_append_sheet(xlWb, filled, 'Fruit Batch Sheet');
+        } catch (e) {
+          alert('Fruit template error: ' + e.message);
+        }
+      }
     }
 
-    // Tab 3: Slurry Batch Sheet
+    // Tab 3: Slurry Batch Sheet — load template from SharePoint and fill
     if (slurryBatches > 0 && slurryIngs.length > 0) {
-      const slurrySheet = _bs_slurryBatchSheet(wb.productName, slurryIngs, slurryBatches, slurryBatchLbs, slurryTargetBrix);
-      XLSX.utils.book_append_sheet(xlWb, slurrySheet, 'Slurry Batch Sheet');
+      if (!cfg.bsSlurryTpl) {
+        alert('No Slurry Batch Sheet template path set — add it in ⚙ Settings.');
+      } else {
+        try {
+          const buf      = await _fetchSpTemplate(cfg.bsSlurryTpl);
+          const tmplWb   = XLSX.read(buf, { type: 'array' });
+          const tmplWs   = tmplWb.Sheets[tmplWb.SheetNames[0]];
+          const filled   = _fillTemplateSheet(tmplWs, 1, slurryIngs, slurryBatches, slurryBatchLbs, slurryTargetBrix, wb.productName || '', 'Slurry Batch Sheet');
+          XLSX.utils.book_append_sheet(xlWb, filled, 'Slurry Batch Sheet');
+        } catch (e) {
+          alert('Slurry template error: ' + e.message);
+        }
+      }
     }
 
-    // Tab 4: Aseptic Planning (if applicable)
+    // Tab 4: Aseptic Planning (built from scratch)
     const isAseptic = (wb.productLine || '').toLowerCase().includes('aseptic');
     if (isAseptic) {
-      const planSheet = _bs_asepticPlanningSheet(wb.productName, ver, ings);
-      XLSX.utils.book_append_sheet(xlWb, planSheet, 'Production Planning');
+      XLSX.utils.book_append_sheet(xlWb, _bs_asepticPlanningSheet(wb.productName, ver, ings), 'Production Planning');
     }
 
-    // Download
     const slug = (wb.productName || 'product').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     XLSX.writeFile(xlWb, slug + '-batch-sheets.xlsx');
     closeModal('modal-batchsheet');
   }
-
-  /* ── Sheet builders ─────────────────────────────────────────── */
 
   function _bs_approvedFormulaSheet(ver, ings) {
     const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
