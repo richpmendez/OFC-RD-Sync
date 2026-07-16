@@ -6,6 +6,8 @@
 <title>OFC Formula Sync — Bench to Asana</title>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Barlow+Condensed:wght@700;800&display=swap" rel="stylesheet">
@@ -557,6 +559,11 @@ html, body { height: 100%; }
 .ml-auto { margin-left: auto; }
 .flex { display: flex; }
 .gap-8 { gap: 8px; }
+.modal.wide { max-width: 560px; }
+.origin-radios { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px; }
+.origin-radios label { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+#devspec-btn { border-color: var(--blue); color: var(--black); }
+#devspec-btn:hover { background: var(--blue); border-color: var(--black); }
 </style>
 </head>
 <body>
@@ -720,6 +727,11 @@ html, body { height: 100%; }
         <div class="ver-pills" id="sync-ver-pills"></div>
         <div class="stored-formulas-bar" id="sync-stored-formulas"></div>
         <div id="sync-status-el"></div>
+        <button class="btn btn-secondary btn-sm" id="devspec-btn"
+        onclick="App.openDevSpecModal()" disabled
+        title="Draft a development spec sheet for the current version">
+  📄 Dev Spec
+</button>
         <button class="btn btn-success" id="sync-btn" onclick="App.pushToAsana()" disabled>🚀 Sync to Asana</button>
       </div>
 
@@ -1381,6 +1393,7 @@ const App = (() => {
 
   /* ── Main render ─────────────────────────────────────── */
   function _render() {
+    const dsbtn = el('devspec-btn'); if(dsbtn) dsbtn.disabled = !wb;
     if (!wb) return;
     _renderVersionTabs();
     _renderFormula();
@@ -1871,7 +1884,49 @@ const App = (() => {
       );
       if (!taskResp.ok) throw new Error('Could not fetch current task description (HTTP ' + taskResp.status + ')');
       const taskData   = await taskResp.json();
-      const currentHtml = (taskData?.data?.html_notes || '<body></body>').trim();
+      const currentHtml = (taskData?.data?.html_notes || '<body><div id="modal-devspec" class="modal-overlay">
+<div class="modal wide">
+  <h2>📄 Draft Development Spec</h2>
+  <p class="modal-sub">Generates a <strong>DEVELOPMENT</strong> spec sheet for
+    <strong id="ds-ver-label"></strong>.
+    Bench data is pre-filled; review before sending to the customer.</p>
+
+  <div class="form-group">
+    <label>Product Line</label>
+    <select id="ds-productline">
+      <option value="">— Select product line —</option>
+      <option value="frozen-compote">Frozen Compote</option>
+      <option value="frozen-diced">Frozen Diced Pourable Fruit</option>
+      <option value="frozen-smooth">Frozen Smooth Pourable Fruit</option>
+      <option value="shelf-stable-smooth">Shelf Stable Smooth Pourable Fruit</option>
+      <option value="shelf-stable-conc">Shelf Stable Beverage Concentrate</option>
+      <option value="aseptic">Aseptic Puree</option>
+      <option value="canned">Canned Fruit</option>
+      <option value="cocktail-cherries">Cocktail Cherries</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Country of Origin</label>
+    <div class="origin-radios">
+      <label><input type="radio" name="ds-origin" value="domestic and imported"> Domestic &amp; Imported</label>
+      <label><input type="radio" name="ds-origin" value="imported" checked> Imported</label>
+      <label><input type="radio" name="ds-origin" value="USA"> USA (Domestic)</label>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>Item Number <span style="font-weight:400;text-transform:none">(optional)</span></label>
+    <input type="text" id="ds-itemno" placeholder="TBD">
+  </div>
+
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="App.closeModal('modal-devspec')">Cancel</button>
+    <button class="btn btn-primary" onclick="App.confirmDevSpec()">⬇ Generate .docx</button>
+  </div>
+</div>
+</div>
+</body>').trim();
 
       // Strip the outer <body>…</body> wrapper so we can manipulate inner content
       const bodyMatch  = currentHtml.match(/^<body>([\s\S]*)<\/body>$/i);
@@ -2323,7 +2378,133 @@ const App = (() => {
   }
 
   /* ── Public API ──────────────────────────────────────── */
+
+// ── Dev Spec: per-line constants ──────────────────────────────────
+const _DS_LINES = {
+  'frozen-compote': {
+    microRows:[['APC','<100,000 cfu/g','3M Petrifilm'],['Yeast','<500 cfu/g','3M Petrifilm'],['Mold','<500 cfu/g','3M Petrifilm'],['Coliform','<10 cfu/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
+    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD ####',bestUsed:'12 months from manufacture',
+    storage:'Store frozen at -10°F to 0°F (-23°C to -18°C).'
+  },
+  'frozen-diced': {
+    microRows:[['APC','<100,000 cfu/g','3M Petrifilm'],['Yeast','<500 cfu/g','3M Petrifilm'],['Mold','<500 cfu/g','3M Petrifilm'],['Coliform','<10 cfu/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
+    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD ####',bestUsed:'24 months from manufacture',
+    storage:'Store frozen at -10°F to 0°F (-23°C to -18°C).'
+  },
+  'frozen-smooth': {
+    microRows:[['APC','<100,000 cfu/g','3M Petrifilm'],['Yeast','<500 cfu/g','3M Petrifilm'],['Mold','<500 cfu/g','3M Petrifilm'],['Coliform','<10 cfu/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
+    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD ####',bestUsed:'24 months from manufacture',
+    storage:'Store frozen at -10°F to 0°F (-23°C to -18°C).'
+  },
+  'shelf-stable-smooth': {
+    microRows:[['APC','<10 cfu/g','3M Petrifilm'],['Yeast','<10 cfu/g','3M Petrifilm'],['Mold','<10 cfu/g','3M Petrifilm'],['Coliform','Negative/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
+    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD ####',bestUsed:'18 months from manufacture',
+    storage:'Store at ambient temperature, below 80°F (27°C). Refrigerate after opening.'
+  },
+  'shelf-stable-conc': {
+    microRows:[['APC','<10 cfu/g','3M Petrifilm'],['Yeast','<10 cfu/g','3M Petrifilm'],['Mold','<10 cfu/g','3M Petrifilm'],['Coliform','Negative/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
+    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD ####',bestUsed:'18 months from manufacture',
+    storage:'Store at ambient temperature, below 80°F (27°C). Refrigerate after opening.'
+  },
+  'aseptic': {
+    microRows:[['Yeast','Negative/g','AOAC 997.02'],['Mold','Negative/g','AOAC 997.02'],['Coliform','Negative/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
+    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD',bestUsed:'24 months from manufacture',
+    storage:'Store at ambient temperature, below 80°F (27°C). Refrigerate after opening.'
+  },
+  'canned': {
+    microRows:[],metalF:'2.0mm',metalN:'2.5mm',metalS:'3.0mm',lotCode:'JJJ HH:MM YYYY',bestUsed:'36 months from manufacture',
+    storage:'Store at ambient temperature, below 80°F (27°C).'
+  },
+  'cocktail-cherries': {
+    microRows:[['Yeast','<500 cfu/g','3M Petrifilm'],['Mold','<500 cfu/g','3M Petrifilm']],
+    metalF:'1.5mm',metalN:'2.0mm',metalS:'2.5mm',lotCode:'JJJ YYYY',bestUsed:'24 months from manufacture',
+    storage:'Store at ambient temperature, below 80°F (27°C). Refrigerate after opening.'
+  }
+};
+const _DS_LINE_NAMES = {'frozen-compote':'Frozen Compote','frozen-diced':'Frozen Diced Pourable Fruit','frozen-smooth':'Frozen Smooth Pourable Fruit','shelf-stable-smooth':'Shelf Stable Smooth Pourable Fruit','shelf-stable-conc':'Shelf Stable Beverage Concentrate','aseptic':'Aseptic Puree','canned':'Canned Fruit','cocktail-cherries':'Cocktail Cherries'};
+const _DS_ALLERGEN = 'The Oregon Fruit Company does not use tree nuts, peanuts, shellfish, fish, eggs, wheat/gluten, soy, sesame, milk, or mustard in any of our products. Additionally, we do not source any raw materials from facilities that process these allergens. We are not a certified allergen-free facility, but we maintain a rigorous allergen control program.';
+const _DS_NONGMO = 'This product does not contain genetically modified organisms (GMOs) as defined by the Non-GMO Project Standard. Oregon Fruit Company is committed to sourcing non-GMO ingredients and maintains verification records for all raw materials used in this product.';
+const _DS_SDS = 'This product does not fall under the OSHA Hazard Communication Standard (29 CFR 1910.1200) and therefore does not have a Safety Data Sheet (SDS). This product is a food item and is not considered a hazardous material.';
+
+function openDevSpecModal() {
+  if (!wb || !wb.versions.length) return;
+  const ver = wb.versions[selIdx];
+  el('ds-ver-label').textContent = `${wb.productName} ${ver.label}`;
+  const plSel = el('ds-productline');
+  if (wb.productLine) {
+    const id = Object.entries(_DS_LINE_NAMES).find(([,v]) => v === wb.productLine)?.[0] || '';
+    plSel.value = id;
+  }
+  el('ds-itemno').value = wb.itemNumber || '';
+  openModal('modal-devspec');
+}
+
+async function confirmDevSpec() {
+  const lineId = el('ds-productline').value;
+  if (!lineId) { alert('Please select a product line.'); return; }
+  const origin = document.querySelector('input[name="ds-origin"]:checked')?.value || 'imported';
+  const itemNo = el('ds-itemno').value.trim() || 'TBD';
+  closeModal('modal-devspec');
+  if (wb) { wb.productLine = _DS_LINE_NAMES[lineId]; wb.itemNumber = itemNo; }
+  try { await _generateDevSpec(lineId, origin, itemNo); }
+  catch(err) { alert('Dev Spec generation failed: ' + err.message); console.error(err); }
+}
+
+async function _generateDevSpec(lineId, origin, itemNo) {
+  if (!window.docx || !window.saveAs) throw new Error('docx / FileSaver libraries not loaded.');
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, ShadingType } = window.docx;
+  const ver = wb.versions[selIdx];
+  const line = _DS_LINES[lineId];
+  const FONT = 'Calibri', SZ = 20, TAB = 2000;
+  const ingStmt = [...ver.ingredients].sort((a,b) => b.pct - a.pct).map(i => i.description).filter(Boolean).join(', ') + '.';
+  const brixStr = ver.testedBrix != null ? `Tested: ${ver.testedBrix}°Bx` : (ver.totalBrix ? `Target: ${ver.totalBrix}°Bx` : 'TBD');
+  const phStr = ver.testedPh != null ? String(ver.testedPh) : 'TBD';
+  const viscStr = ver.testedVisc != null ? String(ver.testedVisc) : 'TBD';
+  const originStr = origin === 'USA' ? 'Kosher (Orthodox Union). Vegetarian. Vegan. Product of USA.' : `Kosher (Orthodox Union). Vegetarian. Vegan. Made from ${origin} fruit.`;
+  const today = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+  function lv(label, value) {
+    return new Paragraph({ children:[new TextRun({text:label,bold:true,font:FONT,size:SZ}),new TextRun({text:'	'+(value||'TBD'),font:FONT,size:SZ})], tabStops:[{type:'left',position:TAB}], spacing:{after:60} });
+  }
+  function lm(label, body) {
+    return new Paragraph({ children:[new TextRun({text:label,bold:true,font:FONT,size:SZ}),new TextRun({text:'	'+(body||'TBD'),font:FONT,size:SZ})], tabStops:[{type:'left',position:TAB}], indent:{left:TAB,hanging:TAB}, spacing:{after:60} });
+  }
+  function sh(text) {
+    return new Paragraph({ children:[new TextRun({text,bold:true,font:FONT,size:SZ,allCaps:true})], shading:{type:ShadingType.CLEAR,fill:'D9D9D9'}, spacing:{before:120,after:60} });
+  }
+  const banner = new Paragraph({ children:[new TextRun({text:`⚠  DEVELOPMENT VERSION  —  ${wb.productName} ${ver.label}  —  FOR INTERNAL REVIEW ONLY`,bold:true,font:FONT,size:18,color:'7B4F00'})], alignment:AlignmentType.CENTER, shading:{type:ShadingType.CLEAR,fill:'FFF3CD'}, border:{top:{style:BorderStyle.SINGLE,size:12,color:'FFC107'},bottom:{style:BorderStyle.SINGLE,size:12,color:'FFC107'},left:{style:BorderStyle.SINGLE,size:12,color:'FFC107'},right:{style:BorderStyle.SINGLE,size:12,color:'FFC107'}}, spacing:{before:0,after:240} });
+  const microNodes = [];
+  if (line.microRows.length) {
+    const hdrRow = new TableRow({ tableHeader:true, children:['Test','Limit','Method'].map(h => new TableCell({children:[new Paragraph({children:[new TextRun({text:h,bold:true,font:FONT,size:18})]})],shading:{type:ShadingType.CLEAR,fill:'D9D9D9'}})) });
+    const dataRows = line.microRows.map(r => new TableRow({ children:r.map(cell => new TableCell({children:[new Paragraph({children:[new TextRun({text:cell,font:FONT,size:18})]})]}))}));
+    microNodes.push(new Table({ width:{size:80,type:WidthType.PERCENTAGE}, indent:{size:TAB,type:WidthType.DXA}, rows:[hdrRow,...dataRows] }));
+  } else { microNodes.push(lv('Micro:','Per line standard — see QA.')); }
+  const children = [
+    banner,
+    new Paragraph({children:[new TextRun({text:'PRODUCT SPECIFICATION',bold:true,font:'Calibri',size:30,allCaps:true})],alignment:AlignmentType.CENTER,spacing:{after:60}}),
+    new Paragraph({children:[new TextRun({text:`${wb.customer||'Oregon Fruit Co.'} — ${wb.productName} — ${ver.label}`,font:FONT,size:SZ,color:'555555'})],alignment:AlignmentType.CENTER,spacing:{after:240}}),
+    lv('PRODUCT:',wb.productName), lv('ITEM NUMBER:',itemNo), lv('VERSION:',ver.label), lv('DATE:',today), lv('STATUS:',`DEVELOPMENT — ${ver.status||'Bench Trial'}`),
+    sh('INGREDIENTS'), lm('INGREDIENTS:',ingStmt),
+    sh('PHYSICAL PROPERTIES'), lv('Brix:',brixStr), lv('pH:',phStr), lv('Viscosity:',viscStr),
+    sh('MICROBIOLOGICAL SPECIFICATIONS'), ...microNodes,
+    sh('METAL DETECTION'), lv('Ferrous:',line.metalF), lv('Non-Ferrous:',line.metalN), lv('Stainless:',line.metalS),
+    sh('LOT CODE FORMAT'), lv('Format:',line.lotCode),
+    sh('STATUS / ORIGIN'), lv('Certifications:',originStr),
+    sh('BEST USED BY'), lv('Best Used By:',line.bestUsed),
+    sh('STORAGE'), lm('Storage:',line.storage),
+    sh('NUTRITIONAL INFORMATION'),
+    new Paragraph({children:[new TextRun({text:'	[NFP pending — generate via Genesis / Trustwell after formula approval]',font:FONT,size:SZ,italics:true,color:'999999'})],tabStops:[{type:'left',position:TAB}],spacing:{after:120}}),
+    sh('ALLERGENS'), lm('Allergens:',_DS_ALLERGEN),
+    sh('NON-GMO'), lm('Non-GMO:',_DS_NONGMO),
+    sh('SAFETY DATA SHEET (SDS)'), lm('SDS:',_DS_SDS)
+  ];
+  const doc = new Document({ sections:[{properties:{},children}] });
+  const blob = await Packer.toBlob(doc);
+  const fname = `${wb.customer||'OFC'} - ${wb.productName||'Product'} - ${ver.label} - Dev Spec.docx`.replace(/[\/\\?%*:|"<>]/g,'-');
+  saveAs(blob, fname);
+}
+
   return {
+    openDevSpecModal, confirmDevSpec,
     init, login, saveSetup, skipToLocalMode, saveSettings, openSettings,
     openLocalFile, openRecentWb, toggleWbDropdown,
     toggleSpDropdown, spNavigateInto, spNavigateUp, openFromSharePoint, openXlsxFromSharePoint, saveToSharePoint,
