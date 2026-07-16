@@ -907,7 +907,7 @@ const App = (() => {
       loadProjects();
       _loadBcItemsFromSharePoint();
       const lastPath = localStorage.getItem('ofc_last_sp_path');
-      if (lastPath) openFromSharePoint(lastPath);
+      if (lastPath) { if (/\.xlsm?$/i.test(lastPath)) openXlsxFromSharePoint(lastPath); else openFromSharePoint(lastPath); }
     } else {
       showScreen('login');
       if (cfg.asanaPAT) loadProjects();
@@ -2251,7 +2251,7 @@ const App = (() => {
       _render();
       loadProjects();
     } catch(e) {
-      alert('Could not load formula from SharePoint: ' + (e.message || e));
+      console.warn('Could not load formula from SharePoint:', e.message || e); localStorage.removeItem('ofc_last_sp_path');
     }
   }
 
