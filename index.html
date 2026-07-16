@@ -1617,7 +1617,7 @@ const App = (() => {
         storedEl.innerHTML = keys.length
           ? keys.map(k =>
               `<span class="stored-formula-chip">${_escHtml(blocks[k].label)
-              }<button onclick="App.removeFormulaFromTask('${k.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">×</button></span>`
+              }<button onclick="App.removeFormulaFromTask('${k.replace(/\\/g,'\\\`).replace(/'/g,"\`")}')">×</button></span>`
             ).join('')
           : '';
       } else {
@@ -2335,7 +2335,7 @@ const App = (() => {
   /* ── Save to SharePoint ──────────────────────────────── */
   async function saveToSharePoint() {
     if (!wb) { alert('Open or create a formula first.'); return; }
-    if (!_spConfigured()) { alert('SharePoint isn\'t configured yet — see SP_SITE_ID / SP_DRIVE_ID near the top of the script.'); return; }
+    if (!_spConfigured()) { alert('SharePoint isn`t configured yet — see SP_SITE_ID / SP_DRIVE_ID near the top of the script.'); return; }
     if (!account) { alert('Sign in with Microsoft first.'); return; }
 
     let path = wb._spPath;
