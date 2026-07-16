@@ -2409,10 +2409,11 @@ async function confirmDevSpec() {
 async function _generateDevSpec(lineId, origin, itemNo) {
   if (!window.docx || !window.saveAs) {
     await Promise.all([
-      new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://unpkg.com/docx@8.5.0/build/index.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);}),
-      new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);})
+      new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://unpkg.com/docx@8.5.0/build/index.js';s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+s.src));document.head.appendChild(s);}),
+      new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js';s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+s.src));document.head.appendChild(s);})
     ]);
   }
+  if (!window.docx || !window.saveAs) throw new Error('Dev Spec libraries failed to load from CDN.');
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, ShadingType } = window.docx;
   const ver = wb.versions[selIdx];
   const line = _DS_LINES[lineId];
