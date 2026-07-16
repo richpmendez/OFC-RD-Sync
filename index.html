@@ -2409,7 +2409,7 @@ async function confirmDevSpec() {
 async function _generateDevSpec(lineId, origin, itemNo) {
   if (!window.docx || !window.saveAs) {
     await Promise.all([
-      new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://unpkg.com/docx@8.5.0/build/index.js';s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+s.src));document.head.appendChild(s);}),
+      new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/docx@7.8.2/build/index.js';s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+s.src));document.head.appendChild(s);}),
       new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js';s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+s.src));document.head.appendChild(s);})
     ]);
   }
