@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OFC Spec Sheet Builder</title>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--g1:#1b3d1c;--g2:#2d6a2f;--g3:#4a9e4d;--gp:#e8f5e9;--bd:#d0d7de;--tx:#1a1a1a;--mt:#6b7280;--bg:#f5f7f5;--wh:#ffffff}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+/* HEADER */
+.hdr{background:var(--g1);color:#fff;padding:10px 24px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.hdr img{height:36px}
+.hdr h1{font-size:17px;font-weight:600;letter-spacing:.01em}
+.hdr .badge{margin-left:auto;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:20px;font-size:11px}
+/* STEPS */
+.steps{background:var(--wh);border-bottom:1px solid var(--bd);display:flex;padding:0 24px}
+.step{padding:13px 18px;font-size:12px;color:var(--mt);border-bottom:2px solid transparent;cursor:pointer;display:flex;align-items:center;gap:6px}
+.step .num{width:20px;height:20px;border-radius:50%;background:var(--bd);color:var(--wh);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.step.active{color:var(--g2);border-bottom-color:var(--g2)}
+.step.active .num{background:var(--g2)}
+.step.done{color:var(--g3)}
+.step.done .num{background:var(--g3)}
+/* MAIN */
+.main{max-width:1280px;margin:0 auto;padding:24px}
+/* LINE GRID */
+.line-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:8px}
+.line-card{background:var(--wh);border:2px solid var(--bd);border-radius:10px;padding:18px;cursor:pointer;transition:border .15s,transform .1s;position:relative}
+.line-card:hover{border-color:var(--g2);transform:translateY(-2px)}
+.line-card.sel{border-color:var(--g2);background:var(--gp)}
+.line-card .lc-icon{font-size:28px;margin-bottom:8px}
+.line-card h3{font-size:13px;font-weight:700;margin-bottom:4px}
+.line-card p{font-size:11px;color:var(--mt)}
+.line-card .sel-dot{position:absolute;top:10px;right:10px;width:16px;height:16px;border-radius:50%;background:var(--g2);display:none}
+.line-card.sel .sel-dot{display:block}
+/* LAYOUT */
+.two-col{display:grid;grid-template-columns:1fr 440px;gap:20px}
+@media(max-width:900px){.two-col{grid-template-columns:1fr}}
+.panel{background:var(--wh);border:1px solid var(--bd);border-radius:10px;padding:22px}
+.panel-title{font-size:14px;font-weight:700;margin-bottom:16px;color:var(--g1);display:flex;align-items:center;gap:8px}
+.panel-title span{font-size:18px}
+/* FORM */
+.field-section{margin-bottom:20px}
+.fs-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mt);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid #eee}
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:12px;font-weight:600;margin-bottom:3px}
+.fg label .hint{font-weight:400;color:var(--mt);font-size:11px}
+.fg input,.fg textarea,.fg select{width:100%;padding:7px 10px;border:1px solid var(--bd);border-radius:6px;font-size:12px;font-family:inherit;background:var(--wh)}
+.fg textarea{min-height:68px;resize:vertical}
+.fg input:focus,.fg textarea:focus,.fg select:focus{outline:none;border-color:var(--g2);box-shadow:0 0 0 3px rgba(45,106,47,.1)}
+.fg .default-btn{font-size:11px;color:var(--g2);cursor:pointer;margin-top:3px;background:none;border:none;padding:0;text-decoration:underline}
+.radio-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.ro{display:flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--bd);border-radius:5px;cursor:pointer;font-size:12px;user-select:none}
+.ro input{accent-color:var(--g2)}
+.ro:has(input:checked){border-color:var(--g2);background:var(--gp)}
+/* PREVIEW */
+.preview-scroll{max-height:calc(100vh - 200px);overflow-y:auto;border:1px solid #ddd;border-radius:6px;padding:14px;background:#fff}
+/* SPEC SHEET PREVIEW */
+.sp{font-family:'Calibri','Segoe UI',sans-serif;font-size:10.5px;line-height:1.55;color:#111}
+.sp-hdr-wrap{display:flex;align-items:center;margin-bottom:10px;border-bottom:1px solid #ccc;padding-bottom:8px}
+.sp-logo{height:38px;margin-right:12px}
+.sp-co{text-align:center;flex:1;font-size:11px}
+.sp-co strong{font-size:13px;display:block}
+.sp-title-block{border-top:3px solid #000;border-bottom:3px solid #000;text-align:center;font-weight:700;font-size:13px;padding:4px 0;margin-bottom:10px}
+.sp-row{display:grid;grid-template-columns:130px 1fr;gap:4px;margin-bottom:5px}
+.sp-lbl{font-weight:700;text-transform:uppercase;font-size:10px}
+.sp-val{font-size:10.5px}
+.sp-sec{font-weight:700;text-transform:uppercase;font-size:10px;margin-top:10px;margin-bottom:3px}
+.sp-sub{display:grid;grid-template-columns:130px 1fr;gap:4px;margin-left:130px;margin-bottom:2px;font-size:10px}
+.sp-sub .k{color:#333}
+.sp-indent{margin-left:130px;font-size:10px;margin-bottom:3px}
+.sp table{margin-left:130px;border-collapse:collapse;font-size:9.5px;margin-top:3px}
+.sp table th,.sp table td{border:1px solid #444;padding:2px 6px}
+.sp table th{font-weight:700;background:#fff}
+.sp table .c{text-align:center}
+.sp-nfp{margin-left:130px;border:1px solid #aaa;padding:18px;text-align:center;font-style:italic;color:#777;font-size:10px;margin-top:4px}
+/* SUMMARY */
+.sum-grid{display:grid;gap:8px}
+.sum-row{display:flex;gap:10px;font-size:12px;padding:6px 0;border-bottom:1px solid #f0f0f0}
+.sum-lbl{font-weight:600;min-width:150px;color:var(--mt);font-size:11px}
+.sum-val{flex:1}
+.tbd{color:#c77}
+/* BUTTONS */
+.btn{padding:9px 18px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-p{background:var(--g2);color:#fff}.btn-p:hover{background:var(--g1)}
+.btn-s{background:var(--wh);color:var(--tx);border:1px solid var(--bd)}.btn-s:hover{background:var(--bg)}
+.btn-sm{padding:6px 12px;font-size:11px}
+.btn-row{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
+/* EXPORT */
+.ex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:4px}
+@media(max-width:700px){.ex-grid{grid-template-columns:1fr}}
+.ex-card{background:var(--wh);border:1px solid var(--bd);border-radius:10px;padding:20px;text-align:center}
+.ex-card .icon{font-size:32px;margin-bottom:8px}
+.ex-card h3{font-size:13px;font-weight:700;margin-bottom:6px}
+.ex-card p{font-size:11px;color:var(--mt);margin-bottom:12px}
+/* ASANA */
+.asana-box{background:var(--wh);border:1px solid var(--bd);border-radius:10px;padding:20px;margin-top:18px}
+.asana-box h3{font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.task-preview{background:#f7f7f7;border-radius:6px;padding:14px;font-size:11px;font-family:monospace;white-space:pre-wrap;max-height:200px;overflow-y:auto;color:#333}
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:#222;color:#fff;padding:10px 18px;border-radius:8px;font-size:12px;z-index:999;animation:toastIn .2s ease}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+/* HIDDEN */
+.hidden{display:none!important}
+/* LOADING */
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* PRINT */
+@media print{
+  .hdr,.steps,.btn-row,.ex-grid,.asana-box,.form-panel-col,.panel-actions{display:none!important}
+  .two-col{grid-template-columns:1fr!important}
+  .preview-scroll{max-height:none!important;border:none!important;overflow:visible!important}
+  body{background:#fff}
+}
+/* SECTION HEADING */
+.sec-hd{font-size:15px;font-weight:700;margin-bottom:6px;color:var(--g1)}
+.sec-sub{font-size:12px;color:var(--mt);margin-bottom:18px}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <img id="header-logo" src="" alt="OFC">
+  <h1>OFC Spec Sheet Builder</h1>
+  <div class="badge">R&amp;D Tool</div>
+</div>
+<div class="steps" id="steps-bar">
+  <div class="step active" data-step="1"><span class="num">1</span> Product Line</div>
+  <div class="step" data-step="2"><span class="num">2</span> Formula Details</div>
+  <div class="step" data-step="3"><span class="num">3</span> Review</div>
+  <div class="step" data-step="4"><span class="num">4</span> Export</div>
+</div>
+<div class="main" id="app-root"></div>
+
+<script>
+// ─────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────
+
+const ALLERGEN = "The Oregon Fruit Company does not use, nor does it allow, any of the nine major allergens (milk, eggs, peanuts, tree nuts, sesame, fish, shellfish, soy, and wheat) or common sensitizing agents (gluten, products, sulfites, mustard and mustard products, celery and celery products, azo dyes, carmine) in the products or processing areas.";
+const NONGMO = "This product does not contain any components grown or developed from a genetically modified organism and is not a Bioengineered Food, as defined under the USDA National Bioengineered Food Disclosure Standard.";
+const SDS_STMT = "This product does not fall under the guidelines established in 29 CFR 1910 (Occupational Safety and Health Standards), Subpart Z (Toxic and Hazardous Substances), and therefore does not require an SDS.";
+
+const MICRO_BOTTLE = [
+  ["Aerobic Plate Count","<2,000 cfu/g","AOAC – RI PTM 051702"],
+  ["Yeast","<2,000 cfu/g","AOAC – RI PTM 051702"],
+  ["Mold","<2,000 cfu/g","AOAC – RI PTM 051702"],
+  ["Coliform","<10 cfu/g","AOAC – RI PTM 051702"],
+  ["E.coli","<10 cfu/g","AOAC – RI PTM 051702"],
+  ["Salmonella Spp.","Negative in 25g","AOAC Official Method Cert #100701"]
+];
+const MICRO_COMPOTE = [
+  ["Aerobic Plate Count","<5,000 cfu/g","AOAC - RI PTM 051702"],
+  ["Yeast","<2,000 cfu/g","AOAC - RI PTM 051702"],
+  ["Mold","<2,000 cfu/g","AOAC - RI PTM 051702"],
+  ["E. coli","<10 cfu/g","AOAC - RI PTM 051702"],
+  ["Coliforms","<10 cfu/g","AOAC - RI PTM 051702"],
+  ["Salmonella Spp.","Negative in 25g","AOAC Cert # 100701"]
+];
+const MICRO_ASEPTIC = [
+  ["Yeast","<10 cfu/g","FDA BAM, Ch 18"],
+  ["Mold","<10 cfu/g","FDA BAM, Ch 18"],
+  ["Coliforms","<10 cfu/g","AOAC – RI PTM 051702"],
+  ["E. coli","<10 cfu/g","AOAC – RI PTM 051702"],
+  ["Salmonella Spp.","Negative in 25g","AOAC Cert # 100701"]
+];
+const MICRO_COCKTAIL = [
+  ["Standard Plate Count","<1,000 cfu/g","AOAC 990.12, 988.18"],
+  ["Yeast and Mold","<20 cfu/g","AOAC 997.02, 2014.05"]
+];
+
+const LINES = {
+  "frozen-compote":{
+    name:"Frozen Compote",icon:"🍓",pkg:"1-gal HDPE pail (8 lb) or 30 lb pail",
+    extraFields:["pailSize"],
+    processing:"Product is processed following FDA guidelines for Juice HACCP: 21 CFR part 120.",
+    microRows:MICRO_COMPOTE,
+    metalF:"1.0mm",metalN:"1.5mm",metalS:"2.0mm",metalNote:"inline",
+    packagingText:"Contains High Density Polyethylene (HDPE) pail and tamper evident lid. Stack model 10 cases per layer and 6 layers per pallet, 60 cases per pallet. Lot code, time of fill, and best by date are printed on the pail.",
+    lotCode:"YYMMDD ####   YY=Year  MM=Month  DD=Day  ####=Military time\nExample: 260121 1643 = January 21, 2026 at 4:43 pm",
+    statusFn:(o)=>o==="USA"?"Kosher (OU), Vegetarian, Vegan, Product of USA.":`Kosher (OU), Vegetarian, Vegan, Product of USA, made from ${o} fruit.`,
+    bestUsed:["30 months when stored frozen in original unopened containers.","Use within 5 months after removal from frozen storage and store in refrigerator."],
+    storage:"Store and ship frozen at or below -0°F (-18°C). To use, thaw refrigerated 12 - 24 hours.",
+    hasGRAS:false,
+    shippingFn:(data)=>{
+      const p=data.pailSize||"8lb";
+      if(p==="both") return[["See dual pail sizes below",""]];
+      if(p==="30lb") return[["Case Pack:","1 - 30 lb. plastic pail"],["Gross Ship Wt:","31.95 lbs"],["Net Wt:","30 lbs"],["Case Dimensions:","9-15/16\" L × 9-15/16\" W × 13-1/4\" H"],["Cases/Pallet:","60"],["Cases/Layer:","20"],["Layers/Pallet:","3"]];
+      return[["Case Pack:","2 - 8 lbs. plastic pails in 1 case"],["Gross Ship Wt:","17.78 lbs"],["Net Wt:","16 lbs"],["Case Dimensions:",'16.875"L × 8.625"W × 8.625"H'],["Case Cube:","0.726 ft³"],["Cases/Pallet:","60"],["Cases/Layer:","10"],["Layers/Pallet:","6"]];
+    },
+    viscHint:"e.g., 14 – 20 cm/10 seconds (Bostwick at 40° - 45°F)"
+  },
+  "frozen-diced":{
+    name:"Frozen Diced Pourable Fruit",icon:"🍓",pkg:"6 × 35 oz HDPE bottle",
+    extraFields:["pieceSize","daysAfterOpening"],
+    processing:"Prior to dicing, fruit is washed with a diluted peracetic acid solution.\nProduct is not pasteurized.",
+    microRows:MICRO_BOTTLE,
+    metalF:"1.0mm",metalN:"1.5mm",metalS:"2.0mm",metalNote:"inline",
+    packagingText:"High density polyethylene (HDPE) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.",
+    lotCode:"YYMMDD ####   YY=Year  MM=Month  DD=Day  ####=Military time\nExample: 260121 1643 = January 21, 2026 at 4:43 pm\nProduction lot number, time of fill, and best used by date are printed on the bottle.",
+    statusFn:(o)=>o==="USA"?"Kosher (OU), Vegetarian, Vegan, Product of USA.":`Kosher (OU), Vegetarian, Vegan, Product of USA, made from ${o} fruit.`,
+    bestUsedFn:(d)=>["30 months when stored frozen in original unopened containers.",`Use within ${d||14} days after removal from frozen storage and opened.`],
+    storage:"Store and ship frozen at or below 0°F (-18°C). To use, thaw refrigerated 12 – 24 hours.",
+    hasGRAS:false,
+    defaultNet:"13.13 lb (5.96 kg)",defaultGross:"14.25 lb (6.46 kg)",defaultDays:"14",
+    shippingFn:(data)=>[["Case Pack:","6 - 35 oz plastic bottles"],["Gross Ship Wt:",data.grossWeight||"14.25 lb (6.46 kg)"],["Net Wt:",data.netWeight||"13.13 lb (5.96 kg)"],["Case Dimensions:",'9.5"L × 6.375"W × 10.375"H'],["Case Cube:","0.364 ft³"],["Cases/Pallet:","140"],["Cases/Layer:","28"],["Layers/Pallet:","5"]],
+    viscHint:'e.g., 14 - 20 cm/10 sec. (Bostwick at 40 - 50°F)'
+  },
+  "frozen-smooth":{
+    name:"Frozen Smooth Pourable Fruit",icon:"🫐",pkg:"6 × 32 fl oz HDPE bottle",
+    extraFields:["daysAfterOpening"],
+    processing:"Product is pasteurized following FDA guidelines for Juice HACCP: 21 CFR part 120.",
+    microRows:MICRO_BOTTLE,
+    metalF:"1.0mm",metalN:"1.5mm",metalS:"2.0mm",metalNote:"inline",
+    packagingText:"High density polyethylene (HDPE) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.",
+    lotCode:"YYMMDD ####   YY=Year  MM=Month  DD=Day  ####=Military time\nExample: 260121 1643 = January 21, 2026 at 4:43 pm",
+    statusFn:(o)=>o==="USA"?"Kosher (OU), Vegetarian, Vegan, Product of USA.":`Kosher (OU), Vegetarian, Vegan, Product of USA, made from ${o} fruit.`,
+    bestUsedFn:(d)=>["30 months when stored frozen in original unopened containers.",`Use within ${d||30} days after removal from frozen storage.`],
+    storage:"Store and ship frozen at or below 0°F (-18°C). To use, thaw refrigerated 12 – 24 hours.",
+    hasGRAS:false,
+    defaultNet:"14.16 lb (6.42 kg)",defaultGross:"15.16 lb (6.88 kg)",defaultDays:"30",
+    shippingFn:(data)=>[["Case Pack:","6 - 32 fl oz plastic bottles"],["Gross Ship Wt:",data.grossWeight||"15.16 lb (6.88 kg)"],["Net Wt:",data.netWeight||"14.16 lb (6.42 kg)"],["Case Dimensions:",'9.5"L × 6.375"W × 10.375"H'],["Case Cube:","0.364 ft³"],["Cases/Pallet:","140"],["Cases/Layer:","28"],["Layers/Pallet:","5"]],
+    viscHint:'e.g., 14 - 20 cm/10 seconds (Bostwick at 40 - 50°F)'
+  },
+  "shelf-stable-smooth":{
+    name:"Shelf Stable Smooth Pourable Fruit",icon:"🫙",pkg:"6 × 32 fl oz PP bottle",
+    extraFields:[],
+    processing:"Product is pasteurized following FDA guidelines for Juice HACCP: 21 CFR part 120.",
+    microRows:MICRO_BOTTLE,
+    metalF:"1.0mm",metalN:"1.5mm",metalS:"2.0mm",metalNote:"inline",
+    packagingText:"Polypropylene (PP) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.",
+    lotCode:"YYMMDD ####   YY=Year  MM=Month  DD=Day  ####=Military time\nExample: 260121 1643 = January 21, 2026 at 4:43 pm",
+    statusFn:(o)=>o==="USA"?"Kosher (OU), Vegetarian, Vegan, Product of USA.":`Kosher (OU), Vegetarian, Vegan, Product of USA, made from ${o} fruit.`,
+    bestUsed:["12 months at ambient in original unopened containers.","Use within 30 days after opening."],
+    storage:"Product is shelf stable, no refrigeration is necessary for food safety of unopened bottles. Refrigerate after opening and use within 30 days after opening.",
+    hasGRAS:false,
+    defaultNet:"14.19 lb (6.44 kg)",defaultGross:"15.59 lb (7.07 kg)",
+    shippingFn:(data)=>[["Case Pack:","6 - 32 fl oz plastic bottles"],["Gross Ship Wt:",data.grossWeight||"15.59 lb (7.07 kg)"],["Net Wt:",data.netWeight||"14.19 lb (6.44 kg)"],["Case Dimensions:",'9.5"L × 6.375"W × 10.375"H'],["Case Cube:","0.364 ft³"],["Cases/Pallet:","140"],["Cases/Layer:","28"],["Layers/Pallet:","5"]],
+    viscHint:'e.g., 14 - 20 cm/10 seconds (Bostwick at 68 - 72°F)'
+  },
+  "shelf-stable-conc":{
+    name:"Shelf Stable Beverage Concentrate",icon:"🧃",pkg:"6 × 32 fl oz PP bottle",
+    extraFields:["dilutionRatio","juiceContent"],
+    processing:"Product is pasteurized following FDA guidelines for Juice HACCP: 21 CFR part 120.",
+    microRows:MICRO_BOTTLE,
+    metalF:"1.0mm",metalN:"1.5mm",metalS:"2.0mm",metalNote:"inline",
+    packagingText:"Polypropylene (PP) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.",
+    lotCode:"YYMMDD ####   YY=Year  MM=Month  DD=Day  ####=Military time\nExample: 260121 1643 = January 21, 2026 at 4:43 pm",
+    statusFn:(o)=>o==="USA"?"Kosher (OU), Vegetarian, Vegan, Product of USA.":`Kosher (OU), Vegetarian, Vegan, Product of USA, made from ${o} fruit.`,
+    bestUsed:["12 months at ambient in original unopened containers.","Use within 30 days after opening."],
+    storage:"Product is shelf stable, no refrigeration is necessary for food safety of unopened bottles. Refrigerate after opening and use within 30 days after opening.",
+    hasGRAS:false,
+    defaultNet:"15.35 lb (6.96 kg)",defaultGross:"16.75 lb (7.60 kg)",
+    shippingFn:(data)=>[["Case Pack:","6 – 32 fl oz plastic bottles"],["Gross Ship Wt:",data.grossWeight||"16.75 lb (7.60 kg)"],["Net Wt:",data.netWeight||"15.35 lb (6.96 kg)"],["Case Dimensions:",'9.5"L × 6.375"W × 10.375"H'],["Case Cube:","0.364 ft³"],["Cases/Pallet:","140"],["Cases/Layer:","28"],["Layers/Pallet:","5"]],
+    viscHint:'e.g., 20+ cm/10 seconds (Bostwick at 68 - 72°F)'
+  },
+  "aseptic":{
+    name:"Aseptic Puree",icon:"🥁",pkg:"55 gal drum (425 lb) and/or 2300 lb tote",
+    extraFields:["packFormats","drumItemNumber","toteItemNumber","specificGravity","aroma","defects"],
+    processing:"Puree is pasteurized at 195˚F or higher for a minimum of 30 seconds for commercial sterility. Puree is cooled and aseptically packaged. Aseptic puree is guaranteed to comply with FDA, Juice HACCP: 21 CFR Part 120, applicable state and local laws and regulations.",
+    microRows:MICRO_ASEPTIC,
+    metalF:"1.0mm",metalN:"1.5mm",metalS:"2.0mm",metalNote:"inline",
+    packagingText:"Aseptic metalized bag in 55 gallon steel drum with tamper-evident seal; drums double-lined with blue, food grade poly-liners.",
+    lotCode:"YYMMDD identifies the date of production\n(YY=Year  MM=Month  DD=Day)",
+    statusFn:()=>"Aseptic, Kosher (Orthodox Union), Vegetarian, Vegan.",
+    bestUsed:["18 months shelf life at ambient temperatures (<75°F).","Opened packages must be frozen to prevent spoilage."],
+    storage:"Product is commercial sterile and shelf stable, no refrigeration is necessary for food safety of unopened bags. Refrigerated storage is recommended to maintain optimal color.",
+    hasGRAS:true,
+    shippingFn:(data)=>{
+      const pf=data.packFormats||"drum";
+      const rows=[];
+      if(pf==="drum"||pf==="both"){rows.push(["DRUM — Net Wt:","425 lbs (192.8 kg)"],["Drum Gross Wt:","465 lbs (210.9 kg)"],["Drums/Pallet:","4"]);}
+      if(pf==="tote"||pf==="both"){rows.push(["TOTE — Net Wt:","2300 lbs (1043.1 kg)"],["Tote Gross Wt:","2450 lbs (1111 kg)"],["Totes/Pallet:","1"]);}
+      return rows;
+    },
+    viscHint:"e.g., 90 – 100 cP with S01 spindle, 100 RPM, 500 mL Sample"
+  },
+  "canned":{
+    name:"Canned Fruit",icon:"🥫",pkg:"8 × 300×407 cans, shrink-wrapped tray",
+    extraFields:["ingredientPct","minNetWeight","minDrainedWeight","colorGrade","defectsGrade","characterGrade"],
+    processing:"Commercially sterile via retort process.",
+    microRows:[],
+    metalF:"2.0mm",metalN:"2.5mm",metalS:"3.0mm",metalNote:"belt",
+    packagingText:"Can Size: 300 × 407. Can Type: A dark fruit three piece can with a welded side seam protected by a powdered stripe and a double interior enamel finish. Case: Eight (8) cans in a shrink wrapped, corrugated tray.",
+    lotCode:"YYMMDD####  and  SCYY MMDDSS\nExample: 260211 1643 = February 11, 2026 at 4:43 pm",
+    statusFn:()=>"Kosher, Vegetarian, Vegan, Product of USA.",
+    bestUsed:["Product is commercially sterile and shelf stable when stored at ambient (70°F) temperatures.","For best quality, use within two (2) years of processing."],
+    storage:"Store at ambient (70°F) temperatures.",
+    hasGRAS:false,
+    shippingFn:()=>[["Can Size:","300 × 407"],["Case Pack:","8 cans per shrink-wrapped tray"],["Can Vacuum:","6 - 13 inches Hg"],["Headspace:","4 - 8 (1/16th inch gauge)"],["Can Center Temp:","190°F minimum"]],
+    viscHint:""
+  },
+  "cocktail-cherries":{
+    name:"Cocktail Cherries",icon:"🍒",pkg:"10 oz or 29 oz glass jars",
+    extraFields:["jarSizes","tenOzUpc","twentyNineOzUpc","pitsStems"],
+    processing:"Cherries are prepared with cherries that have been preserved, sized, pitted, sorted, then packed in a sweetened syrup, bottled, and pasteurized.",
+    microRows:MICRO_COCKTAIL,
+    metalF:"1.5mm",metalN:"2.0mm",metalS:"2.5mm",metalNote:"continuously monitored",
+    packagingText:"Wide mouth glass jars with black enameled metal lug cap closure.",
+    lotCode:"YYMMDDHHMM\nExample: 2601111643 = January 11, 2026 at 4:43 pm",
+    statusFn:()=>"Kosher, Vegetarian, Vegan.",
+    bestUsed:["3 years from date of manufacture.","Do not refrigerate."],
+    storage:"Product is shelf stable when stored at ambient (70°F) temperatures. Shelf life is 3 years from date of manufacture. Do not refrigerate.",
+    hasGRAS:false,
+    shippingFn:()=>[["Packaging:","Wide mouth glass jars with lug cap closure"],["Shelf Life:","3 years from date of manufacture"]],
+    viscHint:""
+  }
+};
+
+// ─────────────────────────────────────────
+// APP STATE
+// ─────────────────────────────────────────
+const state={step:1,lineId:null,formData:{}};
+
+// ─────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────
+function $(id){return document.getElementById(id)}
+function toast(msg,ms=2000){
+  const t=document.createElement('div');t.className='toast';t.textContent=msg;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),ms);
+}
+function setLogoSrc(){
+  // Use the full logo from assets
+  try{$('header-logo').src='data:image/png;base64,'+LOGO_FULL;}
+  catch(e){}
+}
+
+function updateSteps(){
+  document.querySelectorAll('.step').forEach(el=>{
+    const s=+el.dataset.step;
+    el.className='step'+(s===state.step?' active':s<state.step?' done':'');
+  });
+}
+
+// ─────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────
+function render(){
+  updateSteps();
+  const root=$('app-root');
+  if(state.step===1) root.innerHTML=renderStep1();
+  else if(state.step===2) root.innerHTML=renderStep2();
+  else if(state.step===3) root.innerHTML=renderStep3();
+  else if(state.step===4) root.innerHTML=renderStep4();
+  attachHandlers();
+}
+
+// ── STEP 1: Product Line ─────────────────
+function renderStep1(){
+  const cards=Object.entries(LINES).map(([id,ln])=>`
+    <div class="line-card${state.lineId===id?' sel':''}" data-line="${id}">
+      <div class="sel-dot"></div>
+      <div class="lc-icon">${ln.icon}</div>
+      <h3>${ln.name}</h3>
+      <p>${ln.pkg}</p>
+    </div>`).join('');
+  return`<div class="sec-hd">Select Product Line</div>
+    <div class="sec-sub">Choose the line that matches the packaging format for this spec.</div>
+    <div class="line-grid">${cards}</div>
+    <div class="btn-row">
+      <button class="btn btn-p" id="step1-next" ${!state.lineId?'disabled':''}>Continue →</button>
+    </div>`;
+}
+
+// ── STEP 2: Form ─────────────────────────
+function fGroup(id,label,hint,type='text',val='',extraAttrs=''){
+  const v=val||'';
+  if(type==='textarea') return`<div class="fg"><label>${label}${hint?` <span class="hint">${hint}</span>`:''}
+    </label><textarea id="${id}" ${extraAttrs}>${v}</textarea></div>`;
+  return`<div class="fg"><label>${label}${hint?` <span class="hint">${hint}</span>`:''}
+    </label><input type="${type}" id="${id}" value="${v.replace(/"/g,'&quot;')}" ${extraAttrs}></div>`;
+}
+function fRadio(id,label,opts,val){
+  const btns=opts.map(o=>`<label class="ro"><input type="radio" name="${id}" value="${o.v}"${val===o.v?' checked':''}> ${o.l}</label>`).join('');
+  return`<div class="fg"><label>${label}</label><div class="radio-row">${btns}</div></div>`;
+}
+function renderStep2(){
+  const d=state.formData;
+  const ln=LINES[state.lineId];
+  const ef=ln.extraFields||[];
+  // Base sections
+  let html=`<div class="two-col">
+  <div class="form-panel-col">
+  <div class="panel">
+  <div class="panel-title"><span>📋</span> ${ln.name} — Formula Details</div>`;
+
+  // Basic info
+  html+=`<div class="field-section"><div class="fs-label">Basic Info</div>
+    ${fGroup('productName','Product Name','',  'text',d.productName||'')}
+    ${fGroup('itemNumber','Item Number','(or TBD)','text',d.itemNumber||'TBD')}
+    ${fGroup('description','Description','',  'textarea',d.description||'')}
+    <div class="fg"><button class="default-btn" id="fill-desc">Use default template</button></div>
+  </div>`;
+
+  // Aseptic-specific pack format
+  if(state.lineId==='aseptic'){
+    html+=`<div class="field-section"><div class="fs-label">Pack Formats</div>
+      ${fRadio('packFormats','Pack formats included',[{v:'drum',l:'Drum only'},{v:'tote',l:'Tote only'},{v:'both',l:'Both'}],d.packFormats||'drum')}
+      ${fGroup('drumItemNumber','Drum Item Number','(if applicable)','text',d.drumItemNumber||'TBD')}
+      ${fGroup('toteItemNumber','Tote Item Number','(if applicable)','text',d.toteItemNumber||'TBD')}
+    </div>`;
+  }
+  // Cocktail cherry jar sizes
+  if(state.lineId==='cocktail-cherries'){
+    html+=`<div class="field-section"><div class="fs-label">Jar Sizes</div>
+      ${fRadio('jarSizes','Jar sizes included',[{v:'10oz',l:'10 oz only'},{v:'29oz',l:'29 oz only'},{v:'both',l:'Both sizes'}],d.jarSizes||'both')}
+      ${fGroup('tenOzUpc','10 oz Jar UPC','',  'text',d.tenOzUpc||'041345000423')}
+      ${fGroup('twentyNineOzUpc','29 oz Jar UPC','',  'text',d.twentyNineOzUpc||'041345000430')}
+    </div>`;
+  }
+  // Compote pail size
+  if(state.lineId==='frozen-compote'){
+    html+=`<div class="field-section"><div class="fs-label">Pail Size</div>
+      ${fRadio('pailSize','Pail size',[{v:'8lb',l:'8 lb (2 per case)'},{v:'30lb',l:'30 lb (1 per case)'},{v:'both',l:'Both'}],d.pailSize||'8lb')}
+    </div>`;
+  }
+  // GTINs
+  html+=`<div class="field-section"><div class="fs-label">Identifiers</div>
+    ${state.lineId!=='aseptic'?fGroup('bottleUpc','Bottle / Can UPC','(or TBD)','text',d.bottleUpc||'TBD'):''}
+    ${fGroup('caseGtin','Case GTIN','(or TBD)','text',d.caseGtin||'TBD')}
+  </div>`;
+
+  // Ingredients
+  html+=`<div class="field-section"><div class="fs-label">Formula</div>
+    ${fGroup('ingredients','Ingredient Statement','in descending order by weight','textarea',d.ingredients||'')}
+    ${state.lineId==='canned'?fGroup('ingredientPct','Ingredient Prior to Packaging','e.g., Cherries 75%, Water 25%','text',d.ingredientPct||''):''}
+  </div>`;
+
+  // Physical properties
+  html+=`<div class="field-section"><div class="fs-label">Physical Properties</div>
+    ${fGroup('brix','Brix Range','e.g., 28.0° – 33.0°','text',d.brix||'')}
+    ${fGroup('ph','pH Range','e.g., 2.50 – 3.40','text',d.ph||'')}
+    ${state.lineId!=='canned'&&state.lineId!=='cocktail-cherries'?fGroup('viscosity','Viscosity',ln.viscHint,'text',d.viscosity||''):''}
+    ${state.lineId==='aseptic'?fGroup('specificGravity','Specific Gravity','e.g., 1.040 – 1.070','text',d.specificGravity||''):''}
+    ${ef.includes('pieceSize')?fGroup('pieceSize','Piece Size','e.g., Chunky pieces should pass through a 6.0 mm straw','text',d.pieceSize||''):''}
+    ${fGroup('color','Color Description','','text',d.color||'')}
+    ${fGroup('flavor','Flavor Description','','text',d.flavor||'')}
+    ${state.lineId==='aseptic'?fGroup('aroma','Aroma Description','','text',d.aroma||''):''}
+    ${state.lineId==='aseptic'?fGroup('defects','Defects','','text',d.defects||'Free from foreign material'):''}
+    ${state.lineId==='cocktail-cherries'?fGroup('pitsStems','Pits/Stems Language','','textarea',d.pitsStems||'Not to exceed more than one pit and one stem per 20 pounds. Machine pitted. May contain Pits or Pit Fragments.'):''}
+    ${state.lineId==='canned'?fGroup('colorGrade','Color (Grade Standards)','','textarea',d.colorGrade||''):''}
+    ${state.lineId==='canned'?fGroup('defectsGrade','Defects (Grade Standards)','','textarea',d.defectsGrade||''):''}
+    ${state.lineId==='canned'?fGroup('characterGrade','Character (Grade Standards)','','textarea',d.characterGrade||''):''}
+    ${state.lineId==='canned'?fGroup('minNetWeight','Minimum Net Weight/Can','e.g., 411 g (14.5 oz)','text',d.minNetWeight||''):''}
+    ${state.lineId==='canned'?fGroup('minDrainedWeight','Minimum Drained Weight/Can','e.g., 272.0 g (9.6 oz)','text',d.minDrainedWeight||''):''}
+    ${ef.includes('daysAfterOpening')?fGroup('daysAfterOpening','Days After Opening','default: '+ln.defaultDays,'text',d.daysAfterOpening||ln.defaultDays):''}
+    ${state.lineId==='shelf-stable-conc'?fGroup('dilutionRatio','Dilution Ratio','e.g., 4+1','text',d.dilutionRatio||''):''}
+    ${state.lineId==='shelf-stable-conc'?fGroup('juiceContent','Juice Content When Prepared','e.g., 9% juice when prepared as 4+1','text',d.juiceContent||''):''}
+  </div>`;
+
+  // Weight & Origin
+  if(state.lineId!=='aseptic'&&state.lineId!=='canned'&&state.lineId!=='cocktail-cherries'){
+    html+=`<div class="field-section"><div class="fs-label">Weights & Origin</div>
+      ${fGroup('netWeight','Net Weight / Case',ln.defaultNet?`default: ${ln.defaultNet}`:'','text',d.netWeight||ln.defaultNet||'')}
+      ${fGroup('grossWeight','Gross Ship Weight / Case',ln.defaultGross?`default: ${ln.defaultGross}`:'','text',d.grossWeight||ln.defaultGross||'')}
+      ${fRadio('countryOfOrigin','Country of Origin',[{v:'imported',l:'Imported'},{v:'domestic and imported',l:'Domestic & Imported'},{v:'USA',l:'USA'}],d.countryOfOrigin||'imported')}
+    </div>`;
+  } else if(state.lineId==='aseptic'){
+    html+=`<div class="field-section"><div class="fs-label">Origin</div>
+      ${fRadio('countryOfOrigin','Country of Origin',[{v:'imported',l:'Imported'},{v:'domestic and imported',l:'Domestic & Imported'},{v:'USA',l:'USA'}],d.countryOfOrigin||'imported')}
+    </div>`;
+  }
+
+  html+=`<div class="btn-row">
+    <button class="btn btn-s" id="step2-back">← Back</button>
+    <button class="btn btn-p" id="step2-next">Review Summary →</button>
+  </div></div></div>
+
+  <!-- PREVIEW PANE -->
+  <div>
+    <div class="panel">
+      <div class="panel-title"><span>👁</span> Live Preview</div>
+      <div class="preview-scroll" id="preview-pane">${buildPreview(d)}</div>
+    </div>
+  </div>
+  </div>`;
+  return html;
+}
+
+// ── STEP 3: Review ───────────────────────
+function renderStep3(){
+  const d=state.formData;
+  const ln=LINES[state.lineId];
+  const tbds=[];
+  const row=(lbl,val)=>{
+    const isTbd=!val||val==='TBD';
+    if(isTbd) tbds.push(lbl);
+    return`<div class="sum-row"><div class="sum-lbl">${lbl}</div><div class="sum-val${isTbd?' tbd':''}">${val||'<em>TBD</em>'}</div></div>`;
+  };
+  let html=`<div class="two-col">
+  <div class="panel">
+    <div class="panel-title"><span>✅</span> Confirmation Summary</div>
+    <p style="font-size:12px;color:var(--mt);margin-bottom:14px">Review all fields before generating the spec sheet.</p>
+    <div class="sum-grid">
+      ${row('Product Line',ln.name)}
+      ${row('Product Name',d.productName)}
+      ${row('Item Number',d.itemNumber)}
+      ${d.drumItemNumber?row('Drum Item #',d.drumItemNumber):''}
+      ${d.toteItemNumber?row('Tote Item #',d.toteItemNumber):''}
+      ${d.bottleUpc?row('Bottle UPC',d.bottleUpc):''}
+      ${row('Case GTIN',d.caseGtin)}
+      ${row('Ingredient Statement',d.ingredients?d.ingredients.substring(0,80)+(d.ingredients.length>80?'…':''):'')}
+      ${row('Brix',d.brix)}
+      ${row('pH',d.ph)}
+      ${d.viscosity?row('Viscosity',d.viscosity):''}
+      ${d.specificGravity?row('Specific Gravity',d.specificGravity):''}
+      ${d.pieceSize?row('Piece Size',d.pieceSize):''}
+      ${row('Color',d.color)}
+      ${row('Flavor',d.flavor)}
+      ${d.aroma?row('Aroma',d.aroma):''}
+      ${d.defects?row('Defects',d.defects):''}
+      ${d.countryOfOrigin?row('Country of Origin',d.countryOfOrigin):''}
+      ${d.netWeight?row('Net Weight',d.netWeight):''}
+      ${d.grossWeight?row('Gross Ship Wt',d.grossWeight):''}
+      ${d.pailSize?row('Pail Size',d.pailSize):''}
+      ${d.packFormats?row('Pack Formats',d.packFormats):''}
+    </div>
+    ${tbds.length?`<div style="background:#fff8e1;border:1px solid #ffc107;border-radius:6px;padding:10px;margin-top:14px;font-size:11px"><strong>⚠ TBD Fields:</strong> ${tbds.join(', ')}. Fill these in before sending to the customer.</div>`:''}
+    <div class="btn-row">
+      <button class="btn btn-s" id="step3-back">← Edit Fields</button>
+      <button class="btn btn-p" id="step3-next">Generate Spec Sheet →</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-title"><span>👁</span> Preview</div>
+    <div class="preview-scroll">${buildPreview(state.formData)}</div>
+  </div>
+  </div>`;
+  return html;
+}
+
+// ── STEP 4: Export ───────────────────────
+function renderStep4(){
+  const ln=LINES[state.lineId];
+  const asanaTask=buildAsanaTask();
+  return`<div class="sec-hd">Export Spec Sheet</div>
+  <div class="sec-sub">${ln.name} — ${state.formData.productName||'Untitled'}</div>
+  <div class="ex-grid">
+    <div class="ex-card">
+      <div class="icon">📄</div>
+      <h3>Word Document (.docx)</h3>
+      <p>Formatted spec sheet ready for review. Paste in the Nutrition Facts panel before sending.</p>
+      <button class="btn btn-p" id="dl-docx">⬇ Download .docx</button>
+    </div>
+    <div class="ex-card">
+      <div class="icon">📑</div>
+      <h3>PDF</h3>
+      <p>Print the spec sheet as a PDF from your browser's print dialog.</p>
+      <button class="btn btn-p" id="dl-pdf">🖨 Print / Save PDF</button>
+    </div>
+    <div class="ex-card">
+      <div class="icon">📋</div>
+      <h3>Copy Spec Text</h3>
+      <p>Copy the full spec text to clipboard for pasting into Word or sharing.</p>
+      <button class="btn btn-p" id="copy-text">📋 Copy to Clipboard</button>
+    </div>
+  </div>
+  <div class="asana-box">
+    <h3>🟧 Asana NDP Task</h3>
+    <p style="font-size:12px;color:var(--mt);margin-bottom:10px">Task details to create in your NDP project. Copy and paste into Asana, or use the button to send via MCP.</p>
+    <div class="task-preview">${asanaTask}</div>
+    <div class="btn-row">
+      <button class="btn btn-s btn-sm" id="copy-asana">📋 Copy Task Details</button>
+    </div>
+  </div>
+  <div class="btn-row" style="margin-top:18px">
+    <button class="btn btn-s" id="step4-back">← Back to Review</button>
+    <button class="btn btn-s" id="start-over">🔄 New Spec Sheet</button>
+  </div>
+  <!-- Hidden print area -->
+  <div id="print-area" class="hidden" style="font-family:Calibri,sans-serif;padding:20px">
+    ${buildPreview(state.formData)}
+  </div>`;
+}
+
+// ─────────────────────────────────────────
+// PREVIEW BUILDER
+// ─────────────────────────────────────────
+function buildPreview(d){
+  if(!state.lineId) return'<p style="color:var(--mt);font-size:12px">Select a product line to see the preview.</p>';
+  const ln=LINES[state.lineId];
+  const origin=d.countryOfOrigin||'imported';
+  const status=ln.statusFn(origin);
+  const best=typeof ln.bestUsedFn==='function'?ln.bestUsedFn(d.daysAfterOpening):ln.bestUsed;
+  const ship=ln.shippingFn(d);
+
+  let html=`<div class="sp">
+  <div class="sp-hdr-wrap">
+    <img class="sp-logo" src="data:image/png;base64,${LOGO_FULL}" alt="OFC">
+    <div class="sp-co"><strong>The Oregon Fruit Company</strong>3180 22nd St SE, Salem, OR 97302 USA</div>
+  </div>
+  <div class="sp-title-block">PRODUCT SPECIFICATION</div>`;
+
+  // Core rows
+  const row=(lbl,val)=>`<div class="sp-row"><div class="sp-lbl">${lbl}</div><div class="sp-val">${val||'TBD'}</div></div>`;
+  html+=row('PRODUCT:',d.productName);
+  html+=row('ITEM NUMBER:',state.lineId==='aseptic'?`${d.drumItemNumber||'TBD'} (drum) / ${d.toteItemNumber||'TBD'} (tote)`:d.itemNumber);
+  html+=row('DESCRIPTION:',d.description);
+  html+=row('INGREDIENTS:',d.ingredients);
+  if(state.lineId==='canned'&&d.ingredientPct) html+=`<div class="sp-row"><div class="sp-lbl" style="font-size:9px;font-weight:700">INGRED. PRIOR TO<br>PACKAGING:</div><div class="sp-val">${d.ingredientPct}</div></div>`;
+  html+=`<div class="sp-row"><div class="sp-lbl">PROCESSING:</div><div class="sp-val" style="white-space:pre-line">${ln.processing}</div></div>`;
+
+  // Physical properties
+  html+=`<div class="sp-sec">PHYSICAL PROPERTIES:${state.lineId==='aseptic'?' (physical properties vary due to seasonal variation of agricultural commodities)':''}</div>`;
+  if(d.brix) html+=`<div class="sp-sub"><div class="k">Brix:</div><div>${d.brix}</div></div>`;
+  if(d.ph) html+=`<div class="sp-sub"><div class="k">pH:</div><div>${d.ph}</div></div>`;
+  if(d.viscosity) html+=`<div class="sp-sub"><div class="k">Viscosity:</div><div>${d.viscosity}</div></div>`;
+  if(d.specificGravity) html+=`<div class="sp-sub"><div class="k">Specific Gravity:</div><div>${d.specificGravity}</div></div>`;
+  if(d.pieceSize) html+=`<div class="sp-sub"><div class="k">Piece Size:</div><div>${d.pieceSize}</div></div>`;
+  if(state.lineId==='frozen-smooth') html+=`<div class="sp-sub"><div class="k">Piece Size:</div><div>Pourable and smooth</div></div>`;
+  if(d.color) html+=`<div class="sp-sub"><div class="k">Color:</div><div>${d.color}</div></div>`;
+  if(d.flavor) html+=`<div class="sp-sub"><div class="k">Flavor:</div><div>${d.flavor}</div></div>`;
+  if(d.aroma) html+=`<div class="sp-sub"><div class="k">Aroma:</div><div>${d.aroma}</div></div>`;
+  if(d.defects) html+=`<div class="sp-sub"><div class="k">Defects:</div><div>${d.defects}</div></div>`;
+  if(d.pitsStems) html+=`<div class="sp-sub"><div class="k">Pits/Stems:</div><div>${d.pitsStems}</div></div>`;
+
+  // Grade standards (canned)
+  if(state.lineId==='canned'){
+    html+=`<div class="sp-sec">GRADE STANDARDS:</div>`;
+    if(d.colorGrade) html+=`<div class="sp-sub"><div class="k">Color:</div><div>${d.colorGrade}</div></div>`;
+    if(d.defectsGrade) html+=`<div class="sp-sub"><div class="k">Defects:</div><div>${d.defectsGrade}</div></div>`;
+    if(d.characterGrade) html+=`<div class="sp-sub"><div class="k">Character:</div><div>${d.characterGrade}</div></div>`;
+  }
+
+  // Micro spec table
+  if(ln.microRows&&ln.microRows.length){
+    html+=`<div class="sp-sec">MICROBIOLOGICAL SPECIFICATIONS:</div>
+    <table><tr><th>Test</th><th class="c">Limit</th><th class="c">Method</th></tr>
+    ${ln.microRows.map(r=>`<tr><td>${r[0]}</td><td class="c">${r[1]}</td><td class="c">${r[2]}</td></tr>`).join('')}
+    </table>`;
+  }
+
+  // Metal detection
+  const mNote=ln.metalNote==='inline'?'During production, inline metal detectors are challenged and calibrated hourly for adequate sensitivity to and rejection of the following test pieces:':ln.metalNote==='belt'?'During production, belt metal detectors are challenged and calibrated hourly for adequate sensitivity to and rejection of the following test pieces:':'The metal detector is continuously monitored and challenged at defined intervals for adequate sensitivity to and rejection of the following test pieces:';
+  html+=`<div class="sp-sec">METAL DETECTION:</div>
+  <div class="sp-indent">${mNote}</div>
+  <div class="sp-sub"><div class="k">• Ferrous</div><div>${ln.metalF}</div></div>
+  <div class="sp-sub"><div class="k">• Non-Ferrous</div><div>${ln.metalN}</div></div>
+  <div class="sp-sub"><div class="k">• Stainless Steel</div><div>${ln.metalS}</div></div>`;
+
+  // Packaging
+  html+=`<div class="sp-sec">PACKAGING:</div><div class="sp-indent">${ln.packagingText}</div>`;
+
+  // Lot code
+  html+=`<div class="sp-sec">LOT CODE FORMAT:</div><div class="sp-indent" style="white-space:pre-line">${ln.lotCode}</div>`;
+
+  // Identifiers
+  if(state.lineId!=='aseptic') html+=row('GTIN:',d.caseGtin);
+  else html+=row('GTIN:',d.caseGtin||'See packaging');
+
+  // Status
+  html+=`<div class="sp-row"><div class="sp-lbl">STATUS:</div><div class="sp-val">${status}</div></div>`;
+
+  // Best used by + storage
+  if(best&&best.length){
+    html+=`<div class="sp-sec">${state.lineId==='aseptic'?'EXPIRY AND STORAGE:':'BEST USED BY:'}</div>`;
+    best.forEach(b=>html+=`<div class="sp-indent">${b}</div>`);
+  }
+  if(state.lineId!=='aseptic'){
+    html+=`<div class="sp-sec">STORAGE:</div><div class="sp-indent">${ln.storage}</div>`;
+  }
+
+  // Shipping
+  html+=`<div class="sp-sec">SHIPPING INFORMATION:</div>`;
+  ship.forEach(([k,v])=>html+=`<div class="sp-sub"><div class="k">${k}</div><div>${v}</div></div>`);
+
+  // Boilerplate
+  html+=`<div class="sp-sec">ALLERGENS:</div><div class="sp-indent">${ALLERGEN}</div>`;
+  html+=`<div class="sp-sec">NON-GMO:</div><div class="sp-indent">${NONGMO}</div>`;
+  html+=`<div class="sp-sec">SAFETY DATA SHEET (SDS):</div><div class="sp-indent">${SDS_STMT}</div>`;
+  if(ln.hasGRAS) html+=`<div class="sp-sec">GRAS:</div><div class="sp-indent">${d.productName||'This product'} is generally recognized as safe as defined in 21 CFR 170.30(b)(2).</div>`;
+  html+=`<div class="sp-sec">NUTRITIONAL INFORMATION:</div><div class="sp-nfp">[Insert Nutrition Facts panel here]</div>`;
+
+  html+=`</div>`;
+  return html;
+}
+
+// ─────────────────────────────────────────
+// ASANA TASK BUILDER
+// ─────────────────────────────────────────
+function buildAsanaTask(){
+  const d=state.formData;
+  const ln=LINES[state.lineId];
+  const today=new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});
+  return`Task Name: [Customer] — ${d.productName||'New Product'}
+
+Product Line: ${ln.name}
+Status: Bench Trial
+Due Date: [TBD]
+
+Description:
+${d.productName||'New product'} (${ln.name})
+Brix: ${d.brix||'TBD'}  |  pH: ${d.ph||'TBD'}  |  Viscosity: ${d.viscosity||'TBD'}
+Country of Origin: ${d.countryOfOrigin||'TBD'}
+Ingredients: ${d.ingredients?d.ingredients.substring(0,100)+'…':'TBD'}
+
+Comment (v1.0 created ${today}):
+Formula v1.0 created. Bench trial pending.
+${!d.brix||!d.ph?'TBD fields: '+['Brix','pH','Viscosity','Color','Flavor'].filter(f=>!d[f.toLowerCase()]).join(', '):'All core physical properties captured.'}`;
+}
+
+// ─────────────────────────────────────────
+// PLAIN TEXT SPEC
+// ─────────────────────────────────────────
+function buildPlainText(){
+  const d=state.formData;
+  const ln=LINES[state.lineId];
+  const origin=d.countryOfOrigin||'imported';
+  const status=ln.statusFn(origin);
+  const best=typeof ln.bestUsedFn==='function'?ln.bestUsedFn(d.daysAfterOpening):ln.bestUsed;
+  const ship=ln.shippingFn(d);
+  const pad=(lbl,val)=>`${lbl.padEnd(28)}${val||'TBD'}`;
+  let t='';
+  t+='PRODUCT SPECIFICATION\n';
+  t+='═'.repeat(60)+'\n\n';
+  t+=pad('PRODUCT:',d.productName)+'\n';
+  t+=pad('ITEM NUMBER:',d.itemNumber)+'\n';
+  t+=pad('DESCRIPTION:','')+'\n  '+d.description+'\n';
+  t+=pad('INGREDIENTS:','')+'\n  '+d.ingredients+'\n';
+  t+=pad('PROCESSING:','')+'\n  '+ln.processing+'\n\n';
+  t+='PHYSICAL PROPERTIES:\n';
+  if(d.brix) t+='  Brix: '+d.brix+'\n';
+  if(d.ph) t+='  pH: '+d.ph+'\n';
+  if(d.viscosity) t+='  Viscosity: '+d.viscosity+'\n';
+  if(d.color) t+='  Color: '+d.color+'\n';
+  if(d.flavor) t+='  Flavor: '+d.flavor+'\n';
+  t+='\nMICROBIOLOGICAL SPECIFICATIONS:\n';
+  ln.microRows.forEach(r=>t+=`  ${r[0].padEnd(24)}${r[1].padEnd(20)}${r[2]}\n`);
+  t+='\nMETAL DETECTION:\n';
+  t+=`  Ferrous: ${ln.metalF}  |  Non-Ferrous: ${ln.metalN}  |  Stainless Steel: ${ln.metalS}\n`;
+  t+='\nPACKAGING:\n  '+ln.packagingText+'\n';
+  t+='\nLOT CODE FORMAT:\n  '+ln.lotCode+'\n';
+  t+='\nGTIN: '+(d.caseGtin||'TBD')+'\n';
+  t+='\nSTATUS: '+status+'\n';
+  if(best) t+='\nBEST USED BY:\n'+best.map(b=>'  '+b).join('\n')+'\n';
+  t+='\nSTORAGE:\n  '+ln.storage+'\n';
+  t+='\nSHIPPING INFORMATION:\n'+ship.map(([k,v])=>`  ${k.padEnd(22)}${v}`).join('\n')+'\n';
+  t+='\nALLERGENS:\n  '+ALLERGEN+'\n';
+  t+='\nNON-GMO:\n  '+NONGMO+'\n';
+  t+='\nSAFETY DATA SHEET (SDS):\n  '+SDS_STMT+'\n';
+  if(ln.hasGRAS) t+='\nGRAS:\n  '+(d.productName||'This product')+' is generally recognized as safe as defined in 21 CFR 170.30(b)(2).\n';
+  t+='\nNUTRITIONAL INFORMATION:\n  [Insert Nutrition Facts panel here]\n';
+  return t;
+}
+
+// ─────────────────────────────────────────
+// DOCX GENERATION
+// ─────────────────────────────────────────
+async function generateDocx(){
+  const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,
+    Header,Footer,AlignmentType,BorderStyle,WidthType,TabStopType,
+    ImageRun,VerticalAlign}=window.docx;
+
+  const d=state.formData;
+  const ln=LINES[state.lineId];
+  const origin=d.countryOfOrigin||'imported';
+  const status=ln.statusFn(origin);
+  const best=typeof ln.bestUsedFn==='function'?ln.bestUsedFn(d.daysAfterOpening):ln.bestUsed;
+  const ship=ln.shippingFn(d);
+  const today=new Date().toISOString().split('T')[0];
+
+  // Logo bytes
+  const logoRes=await fetch('data:image/png;base64,'+LOGO_FULL);
+  const logoBuf=await logoRes.arrayBuffer();
+  const logoBytes=new Uint8Array(logoBuf);
+
+  const FONT='Calibri';
+  const SZ=20;
+  const TAB=2000;
+  const nb={style:BorderStyle.NONE,size:0,color:'FFFFFF'};
+  const nbs={top:nb,bottom:nb,left:nb,right:nb};
+  const bd={style:BorderStyle.SINGLE,size:4,color:'000000'};
+
+  function run(text,opts={}){
+    return new TextRun({text,font:FONT,size:opts.size||SZ,bold:opts.bold||false,
+      color:opts.color||'000000',italics:opts.italic||false});
+  }
+  function sp(pts=80){return new Paragraph({spacing:{after:pts},children:[]});}
+  function lv(label,value){
+    return new Paragraph({spacing:{after:60},
+      tabStops:[{type:TabStopType.LEFT,position:TAB}],
+      children:[run(label,{bold:true}),run('\t'),run(value||'TBD')]});
+  }
+  function lm(label,body){
+    return new Paragraph({spacing:{after:80},
+      indent:{left:TAB,hanging:TAB},
+      tabStops:[{type:TabStopType.LEFT,position:TAB}],
+      children:[run(label,{bold:true}),run('\t'),run(body||'')]});
+  }
+  function ld(label,body){
+    return[new Paragraph({spacing:{after:0},children:[run(label,{bold:true})]}),
+      new Paragraph({spacing:{after:80},indent:{left:TAB},children:[run(body||'')]})];
+  }
+  function sh(text){
+    return new Paragraph({spacing:{before:200,after:80},children:[run(text,{bold:true})]});
+  }
+  function sr(label,value){
+    return new Paragraph({spacing:{after:0},indent:{left:TAB},
+      tabStops:[{type:TabStopType.LEFT,position:TAB}],
+      children:[run(label),run('\t'),run(value||'')]});
+  }
+  function shipRow(label,value){
+    return new Paragraph({spacing:{after:0},indent:{left:TAB},
+      tabStops:[{type:TabStopType.LEFT,position:TAB+1600}],
+      children:[run(label),run('\t'),run(value||'')]});
+  }
+  function metalRow(name,value){
+    return new Paragraph({spacing:{after:0},indent:{left:TAB},
+      tabStops:[{type:TabStopType.LEFT,position:TAB+1700}],
+      children:[run('• '+name),run('\t'),run(value||'')]});
+  }
+  function cell(text,opts={}){
+    return new TableCell({borders:{top:bd,bottom:bd,left:bd,right:bd},
+      width:{size:opts.width,type:WidthType.DXA},
+      margins:{top:60,bottom:60,left:100,right:100},
+      children:[new Paragraph({alignment:opts.align||AlignmentType.LEFT,
+        children:[run(text,{bold:opts.bold||false})]})]});
+  }
+
+  const HW=2500,MW=9360-2*2500;
+  const docHeader=new Header({children:[
+    new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[HW,MW,HW],
+      borders:{top:nb,bottom:nb,left:nb,right:nb,insideHorizontal:nb,insideVertical:nb},
+      rows:[new TableRow({children:[
+        new TableCell({borders:nbs,width:{size:HW,type:WidthType.DXA},
+          margins:{top:0,bottom:0,left:0,right:0},verticalAlign:VerticalAlign.CENTER,
+          children:[new Paragraph({spacing:{after:0},
+            children:[new ImageRun({data:logoBytes,transformation:{width:130,height:50}})]})]
+        }),
+        new TableCell({borders:nbs,width:{size:MW,type:WidthType.DXA},
+          margins:{top:0,bottom:0,left:0,right:0},verticalAlign:VerticalAlign.CENTER,
+          children:[
+            new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:0},
+              children:[new TextRun({text:'The Oregon Fruit Company',font:FONT,size:28,bold:true})]}),
+            new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:0},
+              children:[new TextRun({text:'3180 22nd St SE, Salem, OR  97302 USA',font:FONT,size:20})]})
+          ]
+        }),
+        new TableCell({borders:nbs,width:{size:HW,type:WidthType.DXA},
+          margins:{top:0,bottom:0,left:0,right:0},verticalAlign:VerticalAlign.CENTER,
+          children:[new Paragraph({spacing:{after:0},children:[]})]
+        })
+      ]})]
+    }),
+    new Paragraph({spacing:{after:0},children:[]})
+  ]});
+
+  const productCode=d.productName?d.productName.substring(0,30):'';
+  const docFooter=new Footer({children:[
+    new Paragraph({spacing:{after:0},
+      tabStops:[{type:TabStopType.RIGHT,position:9360}],
+      children:[run(productCode),run('\t'),run('Revised:  ')]}),
+    new Paragraph({spacing:{after:0},
+      tabStops:[{type:TabStopType.RIGHT,position:9360}],
+      children:[run(''),run('\t'),run('Replaces:  ')]}),
+  ]});
+
+  const children=[];
+
+  // Title block
+  children.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[9360],
+    borders:{top:nb,bottom:nb,left:nb,right:nb,insideHorizontal:nb,insideVertical:nb},
+    rows:[new TableRow({children:[new TableCell({
+      borders:{top:{style:BorderStyle.SINGLE,size:24,color:'000000'},
+        bottom:{style:BorderStyle.SINGLE,size:24,color:'000000'},left:nb,right:nb},
+      width:{size:9360,type:WidthType.DXA},margins:{top:80,bottom:80,left:0,right:0},
+      children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:0},
+        children:[new TextRun({text:'PRODUCT SPECIFICATION',font:FONT,size:28,bold:true})]})]
+    })]})]}));
+  children.push(sp(160));
+
+  // Identification
+  children.push(lv('PRODUCT:',d.productName));
+  children.push(sp(60));
+  if(state.lineId==='aseptic'){
+    children.push(lv('ITEM NUMBER (DRUM):',d.drumItemNumber||'TBD'));
+    children.push(lv('ITEM NUMBER (TOTE):',d.toteItemNumber||'TBD'));
+  } else {
+    children.push(lv('ITEM NUMBER:',d.itemNumber));
+  }
+  children.push(sp(60));
+  children.push(lm('DESCRIPTION:',d.description));
+  children.push(lm('INGREDIENTS:',d.ingredients));
+  if(state.lineId==='canned'&&d.ingredientPct){
+    children.push(lm('INGREDIENT PRIOR TO PACKAGING:',d.ingredientPct));
+  }
+  children.push(lm('PROCESSING:',ln.processing));
+
+  // Physical properties
+  children.push(sh('PHYSICAL PROPERTIES:'+(state.lineId==='aseptic'?' (physical properties vary due to seasonal variation of agricultural commodities)':'')));
+  if(d.brix) children.push(sr('Brix:',d.brix));
+  if(d.ph) children.push(sr('pH:',d.ph));
+  if(d.viscosity) children.push(sr('Viscosity:',d.viscosity));
+  if(d.specificGravity) children.push(sr('Specific Gravity:',d.specificGravity));
+  if(d.pieceSize) children.push(sr('Piece Size:',d.pieceSize));
+  if(state.lineId==='frozen-smooth') children.push(sr('Piece Size:','Pourable and smooth'));
+  if(d.color) children.push(sr('Color:',d.color));
+  if(d.flavor) children.push(sr('Flavor:',d.flavor));
+  if(d.aroma) children.push(sr('Aroma:',d.aroma));
+  if(d.defects) children.push(sr('Defects:',d.defects));
+  if(d.pitsStems) children.push(sr('Pits/Stems:',d.pitsStems));
+
+  // Canned grade standards
+  if(state.lineId==='canned'){
+    children.push(sh('GRADE STANDARDS:'));
+    if(d.colorGrade) children.push(sr('Color:',d.colorGrade));
+    if(d.defectsGrade) children.push(sr('Defects:',d.defectsGrade));
+    if(d.characterGrade) children.push(sr('Character:',d.characterGrade));
+    children.push(sh('PRODUCT CHARACTERISTICS:'));
+    children.push(sr('Can Center Temp:','190°F minimum'));
+    children.push(sr('Vacuum:','6 - 13 inches Hg'));
+    children.push(sr('Headspace:','4 - 8 (1/16th inch gauge)'));
+    if(d.minNetWeight) children.push(sr('Minimum Net Weight:',d.minNetWeight));
+    if(d.minDrainedWeight) children.push(sr('Minimum Drained Weight:',d.minDrainedWeight));
+  }
+
+  // Micro spec table
+  if(ln.microRows&&ln.microRows.length){
+    children.push(sh('MICROBIOLOGICAL SPECIFICATIONS:'));
+    const mw=7400,mcw=[2200,1700,3500];
+    const allRows=[['Test','Limit','Method'],...ln.microRows];
+    children.push(new Table({width:{size:mw,type:WidthType.DXA},columnWidths:mcw,
+      indent:{size:TAB,type:WidthType.DXA},
+      rows:allRows.map((r,i)=>new TableRow({children:[
+        cell(r[0],{width:mcw[0],bold:i===0,align:i===0?AlignmentType.CENTER:AlignmentType.LEFT}),
+        cell(r[1],{width:mcw[1],bold:i===0,align:AlignmentType.CENTER}),
+        cell(r[2],{width:mcw[2],bold:i===0,align:AlignmentType.CENTER}),
+      ]}))}));
+  }
+
+  // Metal detection
+  const mNote=ln.metalNote==='inline'?'During production, inline metal detectors are challenged and calibrated hourly for adequate sensitivity to and rejection of the following test pieces:':ln.metalNote==='belt'?'During production, belt metal detectors are challenged and calibrated hourly for adequate sensitivity to and rejection of the following test pieces:':'The metal detector is continuously monitored and challenged at defined intervals.';
+  children.push(sh('METAL DETECTION:'));
+  children.push(new Paragraph({spacing:{after:60},indent:{left:TAB},children:[run(mNote)]}));
+  children.push(metalRow('Ferrous',ln.metalF));
+  children.push(metalRow('Non-Ferrous',ln.metalN));
+  children.push(metalRow('Stainless Steel',ln.metalS));
+
+  // Packaging
+  children.push(sh('PACKAGING:'));
+  children.push(new Paragraph({spacing:{after:0},indent:{left:TAB},children:[run(ln.packagingText)]}));
+
+  // Lot code
+  children.push(sh('LOT CODE FORMAT:'));
+  ln.lotCode.split('\n').forEach(line=>{
+    children.push(new Paragraph({spacing:{after:0},indent:{left:TAB},children:[run(line)]}));
+  });
+
+  // GTIN & Status
+  children.push(sp(120));
+  children.push(lv('GTIN:',d.caseGtin||'TBD'));
+  children.push(sp(120));
+  children.push(lm('STATUS:',status));
+
+  // Best used by
+  children.push(sh(state.lineId==='aseptic'?'EXPIRY AND STORAGE:':'BEST USED BY:'));
+  if(best) best.forEach(b=>children.push(new Paragraph({spacing:{after:60},indent:{left:TAB},children:[run(b)]})));
+  if(state.lineId!=='aseptic'){
+    children.push(lm('STORAGE:',ln.storage));
+  }
+
+  // Shipping
+  children.push(sh('SHIPPING INFORMATION:'));
+  ship.forEach(([k,v])=>children.push(shipRow(k,v)));
+
+  // Boilerplate
+  children.push(sp(120));
+  children.push(lm('ALLERGENS:',ALLERGEN));
+  children.push(lm('NON-GMO:',NONGMO));
+  ld('SAFETY DATA SHEET (SDS):',SDS_STMT).forEach(p=>children.push(p));
+
+  // GRAS
+  if(ln.hasGRAS){
+    children.push(sh('GRAS:'));
+    children.push(new Paragraph({spacing:{after:0},indent:{left:TAB},
+      children:[run((d.productName||'This product')+' is generally recognized as safe as defined in 21 CFR 170.30(b)(2).')]}));
+  }
+
+  // Nutrition placeholder
+  children.push(sh('NUTRITIONAL INFORMATION:'));
+  const pgb={style:BorderStyle.SINGLE,size:4,color:'AAAAAA'};
+  children.push(new Table({width:{size:6840,type:WidthType.DXA},columnWidths:[6840],
+    indent:{size:TAB,type:WidthType.DXA},
+    rows:[new TableRow({children:[new TableCell({
+      borders:{top:pgb,left:pgb,bottom:pgb,right:pgb},
+      width:{size:6840,type:WidthType.DXA},
+      margins:{top:240,bottom:240,left:200,right:200},
+      children:[new Paragraph({alignment:AlignmentType.CENTER,
+        children:[new TextRun({text:'[Insert Nutrition Facts panel here]',
+          font:FONT,size:SZ,italics:true,color:'777777'})]})]
+    })]})]}));
+
+  const doc=new Document({
+    styles:{default:{document:{run:{font:FONT,size:SZ}}}},
+    sections:[{
+      properties:{page:{size:{width:12240,height:15840},
+        margin:{top:1080,right:1440,bottom:1080,left:1440}}},
+      headers:{default:docHeader},
+      footers:{default:docFooter},
+      children
+    }]
+  });
+
+  const blob=await Packer.toBlob(doc);
+  const name=(d.productName||'OFC_Spec').replace(/[^a-zA-Z0-9]/g,'_')+'_'+today+'.docx';
+  saveAs(blob,name);
+}
+
+// ─────────────────────────────────────────
+// COLLECT FORM DATA
+// ─────────────────────────────────────────
+function collectForm(){
+  const fields=['productName','itemNumber','description','ingredients','brix','ph','viscosity',
+    'color','flavor','aroma','defects','pitsStems','specificGravity','pieceSize',
+    'bottleUpc','caseGtin','netWeight','grossWeight','daysAfterOpening',
+    'drumItemNumber','toteItemNumber','dilutionRatio','juiceContent',
+    'ingredientPct','minNetWeight','minDrainedWeight','colorGrade','defectsGrade','characterGrade',
+    'tenOzUpc','twentyNineOzUpc'];
+  const radios=['countryOfOrigin','pailSize','packFormats','jarSizes'];
+  const d={};
+  fields.forEach(f=>{const el=document.getElementById(f);if(el) d[f]=el.value.trim();});
+  radios.forEach(r=>{const el=document.querySelector(`input[name="${r}"]:checked`);if(el) d[r]=el.value;});
+  return d;
+}
+
+function updatePreview(){
+  state.formData=collectForm();
+  const pane=document.getElementById('preview-pane');
+  if(pane) pane.innerHTML=buildPreview(state.formData);
+}
+
+// ─────────────────────────────────────────
+// DEFAULT DESCRIPTION
+// ─────────────────────────────────────────
+function getDefaultDesc(){
+  const d=state.formData;
+  const n=d.productName||'[Product Name]';
+  switch(state.lineId){
+    case'frozen-compote':return`${n} are diced and mixed with a sweetened sauce and pasteurized. Product is packed in plastic jugs and frozen to maximize product quality.`;
+    case'frozen-diced':return`${n.replace(/Diced.*/,'').trim()} are diced and mixed with a thickened, sweetened sauce, and frozen in 35 oz bottles.`;
+    case'frozen-smooth':return`${n} puree is mixed with a thickened, sweetened sauce and pasteurized. ${n} is packed in 32 fl oz plastic bottles and frozen to maximize product quality.`;
+    case'shelf-stable-smooth':return`${n} puree is mixed with a thickened, sweetened sauce and pasteurized. ${n} is packed in 32 fl oz net volume plastic bottles.`;
+    case'shelf-stable-conc':return`Beverage concentrate with a sweetened juice blend and pasteurized. Contains ${d.juiceContent||'[X]% juice'} when prepared as ${d.dilutionRatio||'[ratio]'}.`;
+    case'aseptic':return`${n} is prepared from ripened, washed and sorted fruit. The product contains no preservatives and no additives. The puree is treated with pectinase, amylase, and cellulase enzymes as processing aids and processed through a final finisher screen that is 0.033".`;
+    default:return n;
+  }
+}
+
+// ─────────────────────────────────────────
+// EVENT HANDLERS
+// ─────────────────────────────────────────
+function attachHandlers(){
+  // Line cards
+  document.querySelectorAll('.line-card').forEach(el=>{
+    el.addEventListener('click',()=>{
+      state.lineId=el.dataset.line;
+      document.querySelectorAll('.line-card').forEach(c=>c.classList.remove('sel'));
+      el.classList.add('sel');
+      const btn=document.getElementById('step1-next');
+      if(btn) btn.disabled=false;
+    });
+  });
+
+  // Navigation
+  const s1n=document.getElementById('step1-next');
+  if(s1n) s1n.addEventListener('click',()=>{state.step=2;render();});
+
+  const s2b=document.getElementById('step2-back');
+  if(s2b) s2b.addEventListener('click',()=>{state.step=1;render();});
+  const s2n=document.getElementById('step2-next');
+  if(s2n) s2n.addEventListener('click',()=>{state.formData=collectForm();state.step=3;render();});
+
+  const s3b=document.getElementById('step3-back');
+  if(s3b) s3b.addEventListener('click',()=>{state.step=2;render();});
+  const s3n=document.getElementById('step3-next');
+  if(s3n) s3n.addEventListener('click',()=>{state.step=4;render();});
+
+  const s4b=document.getElementById('step4-back');
+  if(s4b) s4b.addEventListener('click',()=>{state.step=3;render();});
+  const so=document.getElementById('start-over');
+  if(so) so.addEventListener('click',()=>{state.step=1;state.lineId=null;state.formData={};render();});
+
+  // Fill default description
+  const fd=document.getElementById('fill-desc');
+  if(fd) fd.addEventListener('click',()=>{
+    state.formData=collectForm();
+    const desc=getDefaultDesc();
+    const el=document.getElementById('description');
+    if(el){el.value=desc;state.formData.description=desc;updatePreview();}
+  });
+
+  // Live preview on form change
+  const formInputs=document.querySelectorAll('#app-root input,#app-root textarea,#app-root select');
+  formInputs.forEach(el=>el.addEventListener('input',updatePreview));
+  formInputs.forEach(el=>el.addEventListener('change',updatePreview));
+
+  // Export buttons
+  const dlDocx=document.getElementById('dl-docx');
+  if(dlDocx) dlDocx.addEventListener('click',async()=>{
+    dlDocx.disabled=true;dlDocx.innerHTML='<span class="spin"></span> Generating…';
+    try{await generateDocx();toast('✅ .docx downloaded!');}
+    catch(e){toast('⚠ Error: '+e.message,4000);console.error(e);}
+    dlDocx.disabled=false;dlDocx.innerHTML='⬇ Download .docx';
+  });
+
+  const dlPdf=document.getElementById('dl-pdf');
+  if(dlPdf) dlPdf.addEventListener('click',()=>{
+    const pa=document.getElementById('print-area');
+    if(pa) pa.classList.remove('hidden');
+    window.print();
+    setTimeout(()=>{if(pa) pa.classList.add('hidden');},1000);
+  });
+
+  const ct=document.getElementById('copy-text');
+  if(ct) ct.addEventListener('click',()=>{
+    navigator.clipboard.writeText(buildPlainText()).then(()=>toast('✅ Copied to clipboard!'));
+  });
+
+  const ca=document.getElementById('copy-asana');
+  if(ca) ca.addEventListener('click',()=>{
+    navigator.clipboard.writeText(buildAsanaTask()).then(()=>toast('✅ Asana task details copied!'));
+  });
+
+  // Step navigation clicks
+  document.querySelectorAll('.step').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const s=+el.dataset.step;
+      if(s<state.step){state.step=s;render();}
+    });
+  });
+}
+
+// ─────────────────────────────────────────
+// LOGO (full base64)
+// ─────────────────────────────────────────
+const LOGO_FULL="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";
+
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',()=>{
+  // Set logo
+  try{document.getElementById('header-logo').src='data:image/png;base64,'+LOGO_FULL;}catch(e){}
+  render();
+});
+</script>
+</body>
+</html>
