@@ -1884,49 +1884,7 @@ const App = (() => {
       );
       if (!taskResp.ok) throw new Error('Could not fetch current task description (HTTP ' + taskResp.status + ')');
       const taskData   = await taskResp.json();
-      const currentHtml = (taskData?.data?.html_notes || '<body><div id="modal-devspec" class="modal-overlay">
-<div class="modal wide">
-  <h2>📄 Draft Development Spec</h2>
-  <p class="modal-sub">Generates a <strong>DEVELOPMENT</strong> spec sheet for
-    <strong id="ds-ver-label"></strong>.
-    Bench data is pre-filled; review before sending to the customer.</p>
-
-  <div class="form-group">
-    <label>Product Line</label>
-    <select id="ds-productline">
-      <option value="">— Select product line —</option>
-      <option value="frozen-compote">Frozen Compote</option>
-      <option value="frozen-diced">Frozen Diced Pourable Fruit</option>
-      <option value="frozen-smooth">Frozen Smooth Pourable Fruit</option>
-      <option value="shelf-stable-smooth">Shelf Stable Smooth Pourable Fruit</option>
-      <option value="shelf-stable-conc">Shelf Stable Beverage Concentrate</option>
-      <option value="aseptic">Aseptic Puree</option>
-      <option value="canned">Canned Fruit</option>
-      <option value="cocktail-cherries">Cocktail Cherries</option>
-    </select>
-  </div>
-
-  <div class="form-group">
-    <label>Country of Origin</label>
-    <div class="origin-radios">
-      <label><input type="radio" name="ds-origin" value="domestic and imported"> Domestic &amp; Imported</label>
-      <label><input type="radio" name="ds-origin" value="imported" checked> Imported</label>
-      <label><input type="radio" name="ds-origin" value="USA"> USA (Domestic)</label>
-    </div>
-  </div>
-
-  <div class="form-group">
-    <label>Item Number <span style="font-weight:400;text-transform:none">(optional)</span></label>
-    <input type="text" id="ds-itemno" placeholder="TBD">
-  </div>
-
-  <div class="modal-footer">
-    <button class="btn btn-secondary" onclick="App.closeModal('modal-devspec')">Cancel</button>
-    <button class="btn btn-primary" onclick="App.confirmDevSpec()">⬇ Generate .docx</button>
-  </div>
-</div>
-</div>
-</body>').trim();
+      const currentHtml = (taskData?.data?.html_notes || '<body></body>').trim();
 
       // Strip the outer <body>…</body> wrapper so we can manipulate inner content
       const bodyMatch  = currentHtml.match(/^<body>([\s\S]*)<\/body>$/i);
@@ -2521,5 +2479,47 @@ async function _generateDevSpec(lineId, origin, itemNo) {
 
 window.addEventListener('load', () => App.init());
 </script>
+<div id="modal-devspec" class="modal-overlay">
+<div class="modal wide">
+  <h2>📄 Draft Development Spec</h2>
+  <p class="modal-sub">Generates a <strong>DEVELOPMENT</strong> spec sheet for
+    <strong id="ds-ver-label"></strong>.
+    Bench data is pre-filled; review before sending to the customer.</p>
+
+  <div class="form-group">
+    <label>Product Line</label>
+    <select id="ds-productline">
+      <option value="">— Select product line —</option>
+      <option value="frozen-compote">Frozen Compote</option>
+      <option value="frozen-diced">Frozen Diced Pourable Fruit</option>
+      <option value="frozen-smooth">Frozen Smooth Pourable Fruit</option>
+      <option value="shelf-stable-smooth">Shelf Stable Smooth Pourable Fruit</option>
+      <option value="shelf-stable-conc">Shelf Stable Beverage Concentrate</option>
+      <option value="aseptic">Aseptic Puree</option>
+      <option value="canned">Canned Fruit</option>
+      <option value="cocktail-cherries">Cocktail Cherries</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Country of Origin</label>
+    <div class="origin-radios">
+      <label><input type="radio" name="ds-origin" value="domestic and imported"> Domestic &amp; Imported</label>
+      <label><input type="radio" name="ds-origin" value="imported" checked> Imported</label>
+      <label><input type="radio" name="ds-origin" value="USA"> USA (Domestic)</label>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>Item Number <span style="font-weight:400;text-transform:none">(optional)</span></label>
+    <input type="text" id="ds-itemno" placeholder="TBD">
+  </div>
+
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="App.closeModal('modal-devspec')">Cancel</button>
+    <button class="btn btn-primary" onclick="App.confirmDevSpec()">&#8595; Generate .docx</button>
+  </div>
+</div>
+</div>
 </body>
 </html>
