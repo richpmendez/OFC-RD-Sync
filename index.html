@@ -6,8 +6,6 @@
 <title>OFC Formula Sync — Bench to Asana</title>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Barlow+Condensed:wght@700;800&display=swap" rel="stylesheet">
@@ -2409,7 +2407,12 @@ async function confirmDevSpec() {
 }
 
 async function _generateDevSpec(lineId, origin, itemNo) {
-  if (!window.docx || !window.saveAs) throw new Error('docx / FileSaver libraries not loaded.');
+  if (!window.docx || !window.saveAs) {
+    await Promise.all([
+      new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://unpkg.com/docx@8.5.0/build/index.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);}),
+      new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);})
+    ]);
+  }
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, ShadingType } = window.docx;
   const ver = wb.versions[selIdx];
   const line = _DS_LINES[lineId];
