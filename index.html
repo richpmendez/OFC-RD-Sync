@@ -2403,7 +2403,7 @@ async function confirmDevSpec() {
   closeModal('modal-devspec');
   if (wb) { wb.productLine = _DS_LINE_NAMES[lineId]; wb.itemNumber = itemNo; }
   try { await _generateDevSpec(lineId, origin, itemNo); }
-  catch(err) { alert('Dev Spec generation failed: ' + err.message); console.error(err); }
+  catch(err) { const msg = err && err.message ? err.message : String(err); alert('Dev Spec generation failed:\n' + msg); console.error('Dev Spec error:', err); }
 }
 
 async function _generateDevSpec(lineId, origin, itemNo) {
