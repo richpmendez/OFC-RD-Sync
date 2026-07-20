@@ -2638,6 +2638,7 @@ async function confirmDevSpec() {
         const fname = (customer+' - '+productName+' - '+vLabel+' - Dev Spec.docx').replace(/[\/\\?%*:|"<>]/g,'-');
         saveAs(blob, fname);
       }
+  return {
     openDevSpecModal, confirmDevSpec,
     init, login, saveSetup, skipToLocalMode, saveSettings, openSettings,
     openLocalFile, openRecentWb, toggleWbDropdown,
