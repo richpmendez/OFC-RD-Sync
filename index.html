@@ -2336,48 +2336,83 @@ const App = (() => {
   /* ── Public API ──────────────────────────────────────── */
 
 // ── Dev Spec: per-line constants ──────────────────────────────────
-const _DS_LINES = {
-  'frozen-compote': {
-    microRows:[['APC','<100,000 cfu/g','3M Petrifilm'],['Yeast','<500 cfu/g','3M Petrifilm'],['Mold','<500 cfu/g','3M Petrifilm'],['Coliform','<10 cfu/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
-    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD ####',bestUsed:'12 months from manufacture',
-    storage:'Store frozen at -10°F to 0°F (-23°C to -18°C).'
-  },
-  'frozen-diced': {
-    microRows:[['APC','<100,000 cfu/g','3M Petrifilm'],['Yeast','<500 cfu/g','3M Petrifilm'],['Mold','<500 cfu/g','3M Petrifilm'],['Coliform','<10 cfu/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
-    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD ####',bestUsed:'24 months from manufacture',
-    storage:'Store frozen at -10°F to 0°F (-23°C to -18°C).'
-  },
-  'frozen-smooth': {
-    microRows:[['APC','<100,000 cfu/g','3M Petrifilm'],['Yeast','<500 cfu/g','3M Petrifilm'],['Mold','<500 cfu/g','3M Petrifilm'],['Coliform','<10 cfu/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
-    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD ####',bestUsed:'24 months from manufacture',
-    storage:'Store frozen at -10°F to 0°F (-23°C to -18°C).'
-  },
-  'shelf-stable-smooth': {
-    microRows:[['APC','<10 cfu/g','3M Petrifilm'],['Yeast','<10 cfu/g','3M Petrifilm'],['Mold','<10 cfu/g','3M Petrifilm'],['Coliform','Negative/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
-    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD ####',bestUsed:'18 months from manufacture',
-    storage:'Store at ambient temperature, below 80°F (27°C). Refrigerate after opening.'
-  },
-  'shelf-stable-conc': {
-    microRows:[['APC','<10 cfu/g','3M Petrifilm'],['Yeast','<10 cfu/g','3M Petrifilm'],['Mold','<10 cfu/g','3M Petrifilm'],['Coliform','Negative/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
-    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD ####',bestUsed:'18 months from manufacture',
-    storage:'Store at ambient temperature, below 80°F (27°C). Refrigerate after opening.'
-  },
-  'aseptic': {
-    microRows:[['Yeast','Negative/g','AOAC 997.02'],['Mold','Negative/g','AOAC 997.02'],['Coliform','Negative/g','3M Petrifilm'],['E. coli','Negative/g','3M Petrifilm'],['Salmonella','Negative/25g','FDA BAM']],
-    metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',lotCode:'YYMMDD',bestUsed:'24 months from manufacture',
-    storage:'Store at ambient temperature, below 80°F (27°C). Refrigerate after opening.'
-  },
-  'canned': {
-    microRows:[],metalF:'2.0mm',metalN:'2.5mm',metalS:'3.0mm',lotCode:'JJJ HH:MM YYYY',bestUsed:'36 months from manufacture',
-    storage:'Store at ambient temperature, below 80°F (27°C).'
-  },
-  'cocktail-cherries': {
-    microRows:[['Yeast','<500 cfu/g','3M Petrifilm'],['Mold','<500 cfu/g','3M Petrifilm']],
-    metalF:'1.5mm',metalN:'2.0mm',metalS:'2.5mm',lotCode:'JJJ YYYY',bestUsed:'24 months from manufacture',
-    storage:'Store at ambient temperature, below 80°F (27°C). Refrigerate after opening.'
-  }
-};
-const _DS_LINE_NAMES = {'frozen-compote':'Frozen Compote','frozen-diced':'Frozen Diced Pourable Fruit','frozen-smooth':'Frozen Smooth Pourable Fruit','shelf-stable-smooth':'Shelf Stable Smooth Pourable Fruit','shelf-stable-conc':'Shelf Stable Beverage Concentrate','aseptic':'Aseptic Puree','canned':'Canned Fruit','cocktail-cherries':'Cocktail Cherries'};
+      const _DS_LINES = {
+        'frozen-compote': {
+          microRows:[['APC','<2,000 cfu/g','AOAC – RI PTM 051702'],['Yeast','<2,000 cfu/g','AOAC – RI PTM 051702'],['Mold','<2,000 cfu/g','AOAC – RI PTM 051702'],['Coliform','<10 cfu/g','AOAC – RI PTM 051702'],['E.coli','<10 cfu/g','AOAC – RI PTM 051702'],['Salmonella Spp.','Negative in 25g','AOAC Official Method Cert #100701']],
+          metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',processing:'Product is pasteurized following FDA guidelines for Juice HACCP: 21 CFR part 120.',
+          packaging:'High density polyethylene (HDPE) pails with lids. Production lot number, time of fill and best used by date are printed on the pail. Item number, production lot number and best used by date are printed on the case label.',
+          lotCode:'YYMMDD ####\nYY = Year  MM = Month  DD = Day  #### = Military time\nExample: 260121 1643 = January 21, 2026 at 4:43 pm\nProduction lot number, time of fill, and best used by date are printed on the pail. Product code and production lot number are printed on the case label.',
+          bestUsed:'18 months when stored frozen in original unopened containers.',
+          storage:'Store and ship frozen at or below 0°F (-18°C). Refrigerate after opening and use within 30 days.',
+          shipping:[['Case Pack:','TBD'],['Gross Ship Wt:','TBD'],['Net Wt:','TBD'],['Case Dimensions:','TBD'],['Case Cube:','TBD'],['Cases/Pallet:','TBD']]
+        },
+        'frozen-diced': {
+          microRows:[['APC','<2,000 cfu/g','AOAC – RI PTM 051702'],['Yeast','<2,000 cfu/g','AOAC – RI PTM 051702'],['Mold','<2,000 cfu/g','AOAC – RI PTM 051702'],['Coliform','<10 cfu/g','AOAC – RI PTM 051702'],['E.coli','<10 cfu/g','AOAC – RI PTM 051702'],['Salmonella Spp.','Negative in 25g','AOAC Official Method Cert #100701']],
+          metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',processing:'Product is pasteurized following FDA guidelines for Juice HACCP: 21 CFR part 120.',
+          packaging:'High density polyethylene (HDPE) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.',
+          lotCode:'YYMMDD ####\nYY = Year  MM = Month  DD = Day  #### = Military time\nExample: 260121 1643 = January 21, 2026 at 4:43 pm\nProduction lot number, time of fill, and best used by date are printed on the bottle. Product code and production lot number are printed on the case label.',
+          bestUsed:'30 months when stored frozen in original unopened containers.\nUse within 30 days after removal from frozen storage.',
+          storage:'Store and ship frozen at or below 0°F (-18°C). To use, thaw refrigerated 12 – 24 hours. Refrigerate after opening and use within 30 days after removal from frozen storage.',
+          shipping:[['Case Pack:','6 – 32 fl oz plastic bottles'],['Gross Ship Wt:','TBD'],['Net Wt:','TBD'],['Case Dimensions:','9.5"L × 6.375"W × 10.375"H'],['Case Cube:','0.364 ft³'],['Cases/Pallet:','140'],['Cases/Layer:','28'],['Layers/Pallet:','5']]
+        },
+        'frozen-smooth': {
+          microRows:[['APC','<2,000 cfu/g','AOAC – RI PTM 051702'],['Yeast','<2,000 cfu/g','AOAC – RI PTM 051702'],['Mold','<2,000 cfu/g','AOAC – RI PTM 051702'],['Coliform','<10 cfu/g','AOAC – RI PTM 051702'],['E.coli','<10 cfu/g','AOAC – RI PTM 051702'],['Salmonella Spp.','Negative in 25g','AOAC Official Method Cert #100701']],
+          metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',processing:'Product is pasteurized following FDA guidelines for Juice HACCP: 21 CFR part 120.',
+          packaging:'High density polyethylene (HDPE) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.',
+          lotCode:'YYMMDD ####\nYY = Year  MM = Month  DD = Day  #### = Military time\nExample: 260121 1643 = January 21, 2026 at 4:43 pm\nProduction lot number, time of fill, and best used by date are printed on the bottle. Product code and production lot number are printed on the case label.',
+          bestUsed:'30 months when stored frozen in original unopened containers.\nUse within 30 days after removal from frozen storage.',
+          storage:'Store and ship frozen at or below 0°F (-18°C). To use, thaw refrigerated 12 – 24 hours. Refrigerate after opening and use within 30 days after removal from frozen storage.',
+          shipping:[['Case Pack:','6 – 32 fl oz plastic bottles'],['Gross Ship Wt:','TBD'],['Net Wt:','TBD'],['Case Dimensions:','9.5"L × 6.375"W × 10.375"H'],['Case Cube:','0.364 ft³'],['Cases/Pallet:','140'],['Cases/Layer:','28'],['Layers/Pallet:','5']]
+        },
+        'shelf-stable-smooth': {
+          microRows:[['APC','<2,000 cfu/g','AOAC – RI PTM 051702'],['Yeast','<2,000 cfu/g','AOAC – RI PTM 051702'],['Mold','<2,000 cfu/g','AOAC – RI PTM 051702'],['Coliform','<10 cfu/g','AOAC – RI PTM 051702'],['E.coli','<10 cfu/g','AOAC – RI PTM 051702'],['Salmonella Spp.','Negative in 25g','AOAC Official Method Cert #100701']],
+          metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',processing:'Product is pasteurized following FDA guidelines for Juice HACCP: 21 CFR part 120.',
+          packaging:'Polypropylene (PP) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.',
+          lotCode:'YYMMDD ####\nYY = Year  MM = Month  DD = Day  #### = Military time\nExample: 260121 1643 = January 21, 2026 at 4:43 pm\nProduction lot number, time of fill, and best used by date are printed on the bottle. Product code and production lot number are printed on the case label.',
+          bestUsed:'12 months at ambient in original unopened containers.\nUse within 30 days after opening.',
+          storage:'Product is shelf stable, no refrigeration is necessary for food safety of unopened bottles. Refrigerate after opening and use within 30 days after opening.',
+          shipping:[['Case Pack:','6 – 32 fl oz plastic bottles'],['Gross Ship Wt:','TBD'],['Net Wt:','TBD'],['Case Dimensions:','9.5"L × 6.375"W × 10.375"H'],['Case Cube:','0.364 ft³'],['Cases/Pallet:','140'],['Cases/Layer:','28'],['Layers/Pallet:','5']]
+        },
+        'shelf-stable-conc': {
+          microRows:[['APC','<2,000 cfu/g','AOAC – RI PTM 051702'],['Yeast','<2,000 cfu/g','AOAC – RI PTM 051702'],['Mold','<2,000 cfu/g','AOAC – RI PTM 051702'],['Coliform','<10 cfu/g','AOAC – RI PTM 051702'],['E.coli','<10 cfu/g','AOAC – RI PTM 051702'],['Salmonella Spp.','Negative in 25g','AOAC Official Method Cert #100701']],
+          metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',processing:'Product is pasteurized following FDA guidelines for Juice HACCP: 21 CFR part 120.',
+          packaging:'Polypropylene (PP) bottles with induction seals and polypropylene (PP) lids, 6 bottles per corrugated case. Production lot number, time of fill and best used by date are printed on the bottle. Item number, production lot number and best used by date are printed on the case label.',
+          lotCode:'YYMMDD ####\nYY = Year  MM = Month  DD = Day  #### = Military time\nExample: 260121 1643 = January 21, 2026 at 4:43 pm\nProduction lot number, time of fill, and best used by date are printed on the bottle. Product code and production lot number are printed on the case label.',
+          bestUsed:'12 months at ambient in original unopened containers.\nUse within 30 days after opening.',
+          storage:'Product is shelf stable, no refrigeration is necessary for food safety of unopened bottles. Refrigerate after opening and use within 30 days after opening.',
+          shipping:[['Case Pack:','6 – 32 fl oz plastic bottles'],['Gross Ship Wt:','TBD'],['Net Wt:','TBD'],['Case Dimensions:','9.5"L × 6.375"W × 10.375"H'],['Case Cube:','0.364 ft³'],['Cases/Pallet:','140'],['Cases/Layer:','28'],['Layers/Pallet:','5']]
+        },
+        'aseptic': {
+          microRows:[['APC','<10 cfu/g','FDA BAM'],['Yeast','<10 cfu/g','FDA BAM'],['Mold','<10 cfu/g','FDA BAM'],['Coliform','Negative/g','FDA BAM'],['E.coli','Negative/g','FDA BAM'],['Salmonella Spp.','Negative in 25g','FDA BAM']],
+          metalF:'1.0mm',metalN:'1.5mm',metalS:'2.0mm',
+          processing:'Product is processed following FDA guidelines for aseptic processing: 21 CFR part 113.',
+          packaging:'Product is filled in aseptic bulk containers (drums or totes). Lot number and fill date are printed on each container.',
+          lotCode:'YYMMDD identifies the date of production\n(YY = Year  MM = Month  DD = Day)',
+          bestUsed:'24 months from date of manufacture in original sealed containers.',
+          storage:'Store at or below 40°F (4°C). Do not freeze.',
+          shipping:[['Container:','TBD'],['Net Wt:','TBD'],['Gross Wt:','TBD'],['Containers/Pallet:','TBD']]
+        },
+        'canned': {
+          microRows:[['APC','<100 cfu/g','FDA BAM'],['Yeast','<10 cfu/g','FDA BAM'],['Mold','<10 cfu/g','FDA BAM'],['Coliform','Negative/g','FDA BAM'],['E.coli','Negative/g','FDA BAM'],['Salmonella Spp.','Negative in 25g','FDA BAM']],
+          metalF:'2.0mm',metalN:'2.5mm',metalS:'3.0mm',
+          processing:'Product is thermally processed following FDA guidelines for low-acid canned foods: 21 CFR part 113.',
+          packaging:'Steel cans with double seam lids, packed in corrugated cases.',
+          lotCode:'Identifies the date of production: (Y = Year) (M = Month) (D = Day). Final four digits indicate time of processing.\nYYMMDD####\nExample: 260211 1643 = February 11, 2026 at 4:43 pm',
+          bestUsed:'36 months from date of manufacture.',
+          storage:'Store at ambient temperature, away from heat and moisture.',
+          shipping:[['Case Pack:','TBD'],['Gross Ship Wt:','TBD'],['Net Wt:','TBD'],['Case Dimensions:','TBD'],['Cases/Pallet:','TBD']]
+        },
+        'cocktail-cherries': {
+          microRows:[['Standard Plate Count','<100 cfu/g','FDA BAM'],['Yeast and Mold','<10 cfu/g','FDA BAM']],
+          metalF:'1.5mm',metalN:'2.0mm',metalS:'2.5mm',
+          processing:'Product is thermally processed following FDA guidelines.',
+          packaging:'Glass jars with metal lids, packed in corrugated cases.',
+          lotCode:'YYMMDDHHMM\nExample: 2601111643 = January 11, 2026 at 4:43 pm',
+          bestUsed:'36 months from date of manufacture.',
+          storage:'Store at ambient temperature, away from direct sunlight.',
+          shipping:[['Case Pack:','TBD'],['Gross Ship Wt:','TBD'],['Net Wt:','TBD'],['Case Dimensions:','TBD'],['Cases/Pallet:','TBD']]
+        }
+      };_DS_LINE_NAMES = {'frozen-compote':'Frozen Compote','frozen-diced':'Frozen Diced Pourable Fruit','frozen-smooth':'Frozen Smooth Pourable Fruit','shelf-stable-smooth':'Shelf Stable Smooth Pourable Fruit','shelf-stable-conc':'Shelf Stable Beverage Concentrate','aseptic':'Aseptic Puree','canned':'Canned Fruit','cocktail-cherries':'Cocktail Cherries'};
 const _DS_ALLERGEN = 'The Oregon Fruit Company does not use tree nuts, peanuts, shellfish, fish, eggs, wheat/gluten, soy, sesame, milk, or mustard in any of our products. Additionally, we do not source any raw materials from facilities that process these allergens. We are not a certified allergen-free facility, but we maintain a rigorous allergen control program.';
 const _DS_NONGMO = 'This product does not contain genetically modified organisms (GMOs) as defined by the Non-GMO Project Standard. Oregon Fruit Company is committed to sourcing non-GMO ingredients and maintains verification records for all raw materials used in this product.';
 const _DS_SDS = 'This product does not fall under the OSHA Hazard Communication Standard (29 CFR 1910.1200) and therefore does not have a Safety Data Sheet (SDS). This product is a food item and is not considered a hazardous material.';
@@ -2406,66 +2441,203 @@ async function confirmDevSpec() {
   catch(err) { const msg = err && err.message ? err.message : String(err); alert('Dev Spec generation failed:\n' + msg); console.error('Dev Spec error:', err); }
 }
 
-async function _generateDevSpec(lineId, origin, itemNo) {
-  if (!window.docx || !window.saveAs) {
-    await Promise.all([
-      new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/docx@7.8.2/build/index.js';s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+s.src));document.head.appendChild(s);}),
-      new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js';s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+s.src));document.head.appendChild(s);})
-    ]);
-  }
-  if (!window.docx || !window.saveAs) throw new Error('Dev Spec libraries failed to load from CDN.');
-  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, ShadingType } = window.docx;
-  const ver = wb.versions[selIdx];
-  const line = _DS_LINES[lineId];
-  const FONT = 'Calibri', SZ = 20, TAB = 2000;
-  const ingStmt = [...ver.ingredients].sort((a,b) => b.pct - a.pct).map(i => i.description).filter(Boolean).join(', ') + '.';
-  const brixStr = ver.testedBrix != null ? `Tested: ${ver.testedBrix}°Bx` : (ver.totalBrix ? `Target: ${ver.totalBrix}°Bx` : 'TBD');
-  const phStr = ver.testedPh != null ? String(ver.testedPh) : 'TBD';
-  const viscStr = ver.testedVisc != null ? String(ver.testedVisc) : 'TBD';
-  const originStr = origin === 'USA' ? 'Kosher (Orthodox Union). Vegetarian. Vegan. Product of USA.' : `Kosher (Orthodox Union). Vegetarian. Vegan. Made from ${origin} fruit.`;
-  const today = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
-  function lv(label, value) {
-    return new Paragraph({ children:[new TextRun({text:label,bold:true,font:FONT,size:SZ}),new TextRun({text:'	'+(value||'TBD'),font:FONT,size:SZ})], tabStops:[{type:'left',position:TAB}], spacing:{after:60} });
-  }
-  function lm(label, body) {
-    return new Paragraph({ children:[new TextRun({text:label,bold:true,font:FONT,size:SZ}),new TextRun({text:'	'+(body||'TBD'),font:FONT,size:SZ})], tabStops:[{type:'left',position:TAB}], indent:{left:TAB,hanging:TAB}, spacing:{after:60} });
-  }
-  function sh(text) {
-    return new Paragraph({ children:[new TextRun({text,bold:true,font:FONT,size:SZ,allCaps:true})], shading:{type:ShadingType.CLEAR,fill:'D9D9D9'}, spacing:{before:120,after:60} });
-  }
-  const banner = new Paragraph({ children:[new TextRun({text:`⚠  DEVELOPMENT VERSION  —  ${wb.productName} ${ver.label}  —  FOR INTERNAL REVIEW ONLY`,bold:true,font:FONT,size:18,color:'7B4F00'})], alignment:AlignmentType.CENTER, shading:{type:ShadingType.CLEAR,fill:'FFF3CD'}, border:{top:{style:BorderStyle.SINGLE,size:12,color:'FFC107'},bottom:{style:BorderStyle.SINGLE,size:12,color:'FFC107'},left:{style:BorderStyle.SINGLE,size:12,color:'FFC107'},right:{style:BorderStyle.SINGLE,size:12,color:'FFC107'}}, spacing:{before:0,after:240} });
-  const microNodes = [];
-  if (line.microRows.length) {
-    const hdrRow = new TableRow({ tableHeader:true, children:['Test','Limit','Method'].map(h => new TableCell({children:[new Paragraph({children:[new TextRun({text:h,bold:true,font:FONT,size:18})]})],shading:{type:ShadingType.CLEAR,fill:'D9D9D9'}})) });
-    const dataRows = line.microRows.map(r => new TableRow({ children:r.map(cell => new TableCell({children:[new Paragraph({children:[new TextRun({text:cell,font:FONT,size:18})]})]}))}));
-    microNodes.push(new Table({ width:{size:80,type:WidthType.PERCENTAGE}, indent:{size:TAB,type:WidthType.DXA}, rows:[hdrRow,...dataRows] }));
-  } else { microNodes.push(lv('Micro:','Per line standard — see QA.')); }
-  const children = [
-    banner,
-    new Paragraph({children:[new TextRun({text:'PRODUCT SPECIFICATION',bold:true,font:'Calibri',size:30,allCaps:true})],alignment:AlignmentType.CENTER,spacing:{after:60}}),
-    new Paragraph({children:[new TextRun({text:`${wb.customer||'Oregon Fruit Co.'} — ${wb.productName} — ${ver.label}`,font:FONT,size:SZ,color:'555555'})],alignment:AlignmentType.CENTER,spacing:{after:240}}),
-    lv('PRODUCT:',wb.productName), lv('ITEM NUMBER:',itemNo), lv('VERSION:',ver.label), lv('DATE:',today), lv('STATUS:',`DEVELOPMENT — ${ver.status||'Bench Trial'}`),
-    sh('INGREDIENTS'), lm('INGREDIENTS:',ingStmt),
-    sh('PHYSICAL PROPERTIES'), lv('Brix:',brixStr), lv('pH:',phStr), lv('Viscosity:',viscStr),
-    sh('MICROBIOLOGICAL SPECIFICATIONS'), ...microNodes,
-    sh('METAL DETECTION'), lv('Ferrous:',line.metalF), lv('Non-Ferrous:',line.metalN), lv('Stainless:',line.metalS),
-    sh('LOT CODE FORMAT'), lv('Format:',line.lotCode),
-    sh('STATUS / ORIGIN'), lv('Certifications:',originStr),
-    sh('BEST USED BY'), lv('Best Used By:',line.bestUsed),
-    sh('STORAGE'), lm('Storage:',line.storage),
-    sh('NUTRITIONAL INFORMATION'),
-    new Paragraph({children:[new TextRun({text:'	[NFP pending — generate via Genesis / Trustwell after formula approval]',font:FONT,size:SZ,italics:true,color:'999999'})],tabStops:[{type:'left',position:TAB}],spacing:{after:120}}),
-    sh('ALLERGENS'), lm('Allergens:',_DS_ALLERGEN),
-    sh('NON-GMO'), lm('Non-GMO:',_DS_NONGMO),
-    sh('SAFETY DATA SHEET (SDS)'), lm('SDS:',_DS_SDS)
-  ];
-  const doc = new Document({ sections:[{properties:{},children}] });
-  const blob = await Packer.toBlob(doc);
-  const fname = `${wb.customer||'OFC'} - ${wb.productName||'Product'} - ${ver.label} - Dev Spec.docx`.replace(/[\/\\?%*:|"<>]/g,'-');
-  saveAs(blob, fname);
-}
-
-  return {
+      async function _generateDevSpec(lineId, origin, itemNo) {
+        if (!window.docx || !window.saveAs) {
+          await Promise.all([
+            new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/docx@7.8.2/build/index.js';s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+s.src));document.head.appendChild(s);}),
+            new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js';s.onload=res;s.onerror=()=>rej(new Error('Failed to load '+s.src));document.head.appendChild(s);})
+          ]);
+          if (!window.docx || !window.saveAs) throw new Error('Dev Spec libraries failed to load from CDN.');
+        }
+        const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+          Header, Footer, AlignmentType, BorderStyle, WidthType, TabStopType, ImageRun, VerticalAlign } = window.docx;
+        const ver = wb.versions[selIdx];
+        const line = _DS_LINES[lineId];
+        if (!ver) throw new Error('No version selected.');
+        if (!line) throw new Error('Unknown product line: ' + lineId);
+        // Constants
+        const FONT = 'Calibri', SZ = 20, VALUE_TAB = 2000;
+        const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+        const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
+        const thinBorder = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+        const thinBorders = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+        // Data
+        const productName = wb.productName || 'Product';
+        const customer = wb.customer || 'OFC';
+        const vLabel = ver.label || 'v1.0';
+        const iNo = itemNo || ver.itemNumber || wb.itemNumber || 'TBD';
+        const dateStr = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+        const statusStr = (origin||'DEVELOPMENT') + ' — ' + (ver.status||'On Hold');
+        const brixVal = ver.testedBrix != null ? ver.testedBrix + '°Bx' : (ver.brixMin&&ver.brixMax ? ver.brixMin+'° – '+ver.brixMax+'°Bx' : 'TBD');
+        const phVal = ver.testedPH != null ? String(ver.testedPH) : (ver.phMin&&ver.phMax ? ver.phMin+' – '+ver.phMax : 'TBD');
+        const viscVal = ver.viscosity || ver.testedViscosity || 'TBD';
+        const colorVal = ver.color || 'TBD';
+        const flavorVal = ver.flavor || 'TBD';
+        const ingredientsVal = ver.ingredientStatement || ver.ingredients || 'TBD';
+        const descVal = ver.description || (productName + '.');
+        const gtinVal = ver.gtin || wb.gtin || 'TBD';
+        const coOrigin = ver.countryOfOrigin || wb.countryOfOrigin || 'imported';
+        const statusLine = coOrigin.toLowerCase()==='usa'
+          ? 'Kosher (OU), Vegetarian, Vegan, Product of USA.'
+          : 'Kosher (OU), Vegetarian, Vegan, Product of USA, made from ' + coOrigin + ' fruit.';
+        // Helpers
+        function run(text, opts={}) { return new TextRun({text, font:FONT, size:SZ, bold:opts.bold||false, color:opts.color||'000000', italics:opts.italic||false}); }
+        function spacer(pts=80) { return new Paragraph({spacing:{after:pts},children:[]}); }
+        function labelValue(label, value) {
+          return new Paragraph({spacing:{after:60},tabStops:[{type:TabStopType.LEFT,position:VALUE_TAB}],children:[run(label,{bold:true}),run('\t'),run(value)]});
+        }
+        function labelMultiline(label, body) {
+          return new Paragraph({spacing:{after:80},indent:{left:VALUE_TAB,hanging:VALUE_TAB},tabStops:[{type:TabStopType.LEFT,position:VALUE_TAB}],children:[run(label,{bold:true}),run('\t'),run(body)]});
+        }
+        function labelDroplines(label, body) {
+          return [new Paragraph({spacing:{after:0},children:[run(label,{bold:true})]}),
+                  new Paragraph({spacing:{after:80},indent:{left:VALUE_TAB},children:[run(body)]})];
+        }
+        function sectionHeader(text) {
+          return new Paragraph({spacing:{before:200,after:80},children:[run(text,{bold:true})]});
+        }
+        function subRow(label, value) {
+          return new Paragraph({spacing:{after:0},indent:{left:VALUE_TAB},tabStops:[{type:TabStopType.LEFT,position:VALUE_TAB+1400}],children:[run(label),run('\t'),run(value)]});
+        }
+        function metalRow(name, value) {
+          return new Paragraph({spacing:{after:0},indent:{left:VALUE_TAB},tabStops:[{type:TabStopType.LEFT,position:VALUE_TAB+1700}],children:[run('\u2022 '+name),run('\t'),run(value)]});
+        }
+        function shipRow(label, value) {
+          return new Paragraph({spacing:{after:0},indent:{left:VALUE_TAB},tabStops:[{type:TabStopType.LEFT,position:VALUE_TAB+1600}],children:[run(label),run('\t'),run(value)]});
+        }
+        function tCell(text, opts={}) {
+          return new TableCell({borders:thinBorders,width:{size:opts.width||2000,type:WidthType.DXA},margins:{top:60,bottom:60,left:100,right:100},children:[new Paragraph({alignment:opts.align||AlignmentType.LEFT,children:[run(text,{bold:opts.bold||false})]})]});
+        }
+        // Page header (company name centered)
+        const docHeader = new Header({ children:[
+          new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:0},children:[new TextRun({text:'The Oregon Fruit Company',font:FONT,size:28,bold:true})]}),
+          new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:0},children:[new TextRun({text:'3180 22nd St SE, Salem, OR  97302 USA',font:FONT,size:20})]}),
+          spacer(0)
+        ]});
+        // Footer
+        const docFooter = new Footer({ children:[
+          new Paragraph({spacing:{after:0},tabStops:[{type:TabStopType.RIGHT,position:9360}],children:[run(customer+' — '+productName),run('\t'),run('Revised:  ')]}),
+          new Paragraph({spacing:{after:0},tabStops:[{type:TabStopType.RIGHT,position:9360}],children:[run(''),run('\t'),run('Replaces:  ')]})
+        ]});
+        // Build children
+        const children = [];
+        // Dev banner
+        const bannerBorder = {style:BorderStyle.SINGLE,size:12,color:'FFC107'};
+        children.push(new Table({
+          width:{size:9360,type:WidthType.DXA},columnWidths:[9360],
+          borders:{top:bannerBorder,bottom:bannerBorder,left:bannerBorder,right:bannerBorder,insideHorizontal:noBorder,insideVertical:noBorder},
+          rows:[new TableRow({children:[new TableCell({
+            borders:{top:bannerBorder,left:bannerBorder,bottom:bannerBorder,right:bannerBorder},
+            width:{size:9360,type:WidthType.DXA},margins:{top:60,bottom:60,left:120,right:120},
+            children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:0},
+              children:[run('\u26a0  DEVELOPMENT VERSION \u2014 '+productName+' '+vLabel+' \u2014 FOR INTERNAL REVIEW ONLY',{bold:true,color:'7B4F00'})]})]
+          })]})],
+        }));
+        children.push(spacer(160));
+        // Title block with heavy top+bottom rules
+        const heavyBorder = {style:BorderStyle.SINGLE,size:24,color:'000000'};
+        children.push(new Table({
+          width:{size:9360,type:WidthType.DXA},columnWidths:[9360],
+          borders:{top:heavyBorder,bottom:heavyBorder,left:noBorder,right:noBorder,insideHorizontal:noBorder,insideVertical:noBorder},
+          rows:[new TableRow({children:[new TableCell({
+            borders:{top:heavyBorder,left:noBorder,bottom:heavyBorder,right:noBorder},
+            width:{size:9360,type:WidthType.DXA},margins:{top:80,bottom:80,left:0,right:0},
+            children:[new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:0},children:[new TextRun({text:'PRODUCT SPECIFICATION',font:FONT,size:28,bold:true})]})]
+          })]})],
+        }));
+        children.push(spacer(120));
+        children.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:120},children:[run(customer+' \u2014 '+productName+' \u2014 '+vLabel)]}));
+        // ID block
+        children.push(labelValue('PRODUCT:', productName));
+        children.push(labelValue('ITEM NUMBER:', iNo));
+        children.push(labelValue('VERSION:', vLabel));
+        children.push(labelValue('DATE:', dateStr));
+        children.push(labelValue('STATUS:', statusStr));
+        children.push(spacer(120));
+        // Description, Ingredients, Processing
+        children.push(labelMultiline('DESCRIPTION:', descVal));
+        children.push(labelMultiline('INGREDIENTS:', ingredientsVal));
+        children.push(labelMultiline('PROCESSING:', line.processing));
+        // Physical Properties
+        children.push(sectionHeader('PHYSICAL PROPERTIES:'));
+        children.push(subRow('Brix:', brixVal));
+        children.push(subRow('pH:', phVal));
+        children.push(subRow('Viscosity:', viscVal));
+        children.push(subRow('Color:', colorVal));
+        children.push(subRow('Flavor:', flavorVal));
+        // Microbiological Specifications
+        children.push(sectionHeader('MICROBIOLOGICAL SPECIFICATIONS:'));
+        const mCols = [2200,1700,3500];
+        children.push(new Table({
+          width:{size:7400,type:WidthType.DXA},columnWidths:mCols,
+          indent:{size:VALUE_TAB,type:WidthType.DXA},
+          rows:[
+            new TableRow({children:[tCell('Test',{width:mCols[0],bold:true,align:AlignmentType.CENTER}),tCell('Limit',{width:mCols[1],bold:true,align:AlignmentType.CENTER}),tCell('Method',{width:mCols[2],bold:true,align:AlignmentType.CENTER})]}),
+            ...line.microRows.map(r=>new TableRow({children:[tCell(r[0],{width:mCols[0]}),tCell(r[1],{width:mCols[1],align:AlignmentType.CENTER}),tCell(r[2],{width:mCols[2],align:AlignmentType.CENTER})]}))
+          ],
+        }));
+        // Metal Detection
+        children.push(sectionHeader('METAL DETECTION:'));
+        children.push(new Paragraph({spacing:{after:60},indent:{left:VALUE_TAB},children:[run('During production, inline metal detectors are challenged and calibrated hourly for adequate sensitivity to and rejection of the following test pieces:')]}));
+        children.push(metalRow('Ferrous', line.metalF));
+        children.push(metalRow('Non-Ferrous', line.metalN));
+        children.push(metalRow('Stainless Steel', line.metalS));
+        // Packaging
+        children.push(sectionHeader('PACKAGING:'));
+        children.push(new Paragraph({spacing:{after:0},indent:{left:VALUE_TAB},children:[run(line.packaging)]}));
+        // Lot Code
+        children.push(sectionHeader('LOT CODE FORMAT:'));
+        line.lotCode.split('\n').forEach(l=>children.push(new Paragraph({spacing:{after:0},indent:{left:VALUE_TAB},children:[run(l)]})));
+        // GTIN
+        children.push(spacer(120));
+        children.push(labelValue('GTIN/UPC:', gtinVal));
+        // Status/Origin
+        children.push(spacer(60));
+        children.push(labelMultiline('STATUS:', statusLine));
+        // Best Used By
+        const buLines = line.bestUsed.split('\n');
+        children.push(spacer(60));
+        children.push(labelMultiline('BEST USED BY:', buLines[0]));
+        buLines.slice(1).forEach(l=>children.push(new Paragraph({spacing:{after:60},indent:{left:VALUE_TAB},children:[run(l)]})));
+        // Storage
+        children.push(spacer(60));
+        children.push(labelMultiline('STORAGE:', line.storage));
+        // Shipping Information
+        children.push(sectionHeader('SHIPPING INFORMATION:'));
+        line.shipping.forEach(([lbl,val])=>children.push(shipRow(lbl,val)));
+        // Nutritional Information (placeholder)
+        children.push(sectionHeader('NUTRITIONAL INFORMATION:'));
+        const grayBorder = {style:BorderStyle.SINGLE,size:4,color:'AAAAAA'};
+        children.push(new Table({
+          width:{size:6840,type:WidthType.DXA},columnWidths:[6840],
+          indent:{size:VALUE_TAB,type:WidthType.DXA},
+          rows:[new TableRow({children:[new TableCell({
+            borders:{top:grayBorder,left:grayBorder,bottom:grayBorder,right:grayBorder},
+            width:{size:6840,type:WidthType.DXA},margins:{top:240,bottom:240,left:200,right:200},
+            children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:'[NFP pending \u2014 generate via Genesis / Trustwell after formula approval]',font:FONT,size:SZ,italics:true,color:'777777'})]})],
+          })]})],
+        }));
+        // Allergens
+        children.push(spacer(120));
+        children.push(labelMultiline('ALLERGENS:', _DS_ALLERGEN));
+        // Non-GMO
+        children.push(labelMultiline('NON-GMO:', _DS_NONGMO));
+        // SDS
+        labelDroplines('SAFETY DATA SHEET (SDS):', _DS_SDS).forEach(p=>children.push(p));
+        // Assemble document
+        const doc = new Document({
+          styles:{default:{document:{run:{font:FONT,size:SZ}}}},
+          sections:[{
+            properties:{page:{size:{width:12240,height:15840},margin:{top:1080,right:1440,bottom:1080,left:1440}}},
+            headers:{default:docHeader},
+            footers:{default:docFooter},
+            children
+          }]
+        });
+        const blob = await Packer.toBlob(doc);
+        const fname = (customer+' - '+productName+' - '+vLabel+' - Dev Spec.docx').replace(/[\/\\?%*:|"<>]/g,'-');
+        saveAs(blob, fname);
+      }
     openDevSpecModal, confirmDevSpec,
     init, login, saveSetup, skipToLocalMode, saveSettings, openSettings,
     openLocalFile, openRecentWb, toggleWbDropdown,
