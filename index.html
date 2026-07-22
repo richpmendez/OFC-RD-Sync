@@ -1933,6 +1933,7 @@ const App = (() => {
       _renderSyncBar();
       setTimeout(() => { statusEl.innerHTML = ''; btn.disabled = false; }, 5000);
     } catch(e) {
+      console.error('[OFC pushToAsana]', e.stack || e);
       statusEl.innerHTML = `<span class="sync-status err">❌ ${e.message}</span>`;
       btn.disabled = false;
     }
